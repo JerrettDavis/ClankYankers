@@ -1,0 +1,146 @@
+import type {
+  AppConfig,
+  BackplaneDefinition,
+  ConnectorDefinition,
+  HostConfig,
+  SessionState,
+  SessionSummary,
+} from '../types'
+
+export interface LaunchDraft {
+  backplaneId: string
+  hostId: string
+  connectorId: string
+  cols: number
+  rows: number
+}
+
+const sessionStates: SessionState[] = ['Starting', 'Running', 'Stopped', 'Failed']
+
+export function normalizeSessionState(value: number | string | null | undefined): SessionState {
+  if (typeof value === 'string' && sessionStates.includes(value as SessionState)) {
+    return value as SessionState
+  }
+
+  if (typeof value === 'number' && value >= 0 && value < sessionStates.length) {
+    return sessionStates[value]
+  }
+
+  return 'Running'
+}
+
+export function normalizeSession(summary: Omit<SessionSummary, 'state'> & { state: number | string }): SessionSummary {
+  return {
+    ...summary,
+    state: normalizeSessionState(summary.state),
+  }
+}
+
+export function getEnabledBackplanes(config: AppConfig): BackplaneDefinition[] {
+  return config.backplanes.filter((backplane) => backplane.enabled)
+}
+
+export function getEnabledHosts(config: AppConfig, backplaneId: string): HostConfig[] {
+  return config.hosts.filter((host) => host.enabled && host.backplaneId === backplaneId)
+}
+
+export function getEnabledConnectors(config: AppConfig): ConnectorDefinition[] {
+  return config.connectors.filter((connector) => connector.enabled)
+}
+
+export function coerceLaunchDraft(config: AppConfig, current?: Partial<LaunchDraft>): LaunchDraft {
+  const backplane = pickValue(
+    getEnabledBackplanes(config).map((item) => item.id),
+    current?.backplaneId,
+  )
+
+  const host = pickValue(
+    getEnabledHosts(config, backplane).map((item) => item.id),
+    current?.hostId,
+  )
+
+  const connector = pickValue(
+    getEnabledConnectors(config).map((item) => item.id),
+    current?.connectorId,
+  )
+
+  return {
+    backplaneId: backplane,
+    hostId: host,
+    connectorId: connector,
+    cols: clampDimension(current?.cols, 120),
+    rows: clampDimension(current?.rows, 34),
+  }
+}
+
+export function parseArgumentList(value: string): string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+export function formatArgumentList(values: string[]): string {
+  return values.join(', ')
+}
+
+export function createBackplaneDefinition(): BackplaneDefinition {
+  const id = uniqueId('backplane')
+  return {
+    id,
+    displayName: `New backplane ${id.slice(-4)}`,
+    kind: 'custom',
+    enabled: true,
+  }
+}
+
+export function createHostConfig(backplaneId: string): HostConfig {
+  const id = uniqueId('host')
+  return {
+    id,
+    backplaneId,
+    displayName: `New host ${id.slice(-4)}`,
+    shellExecutable: 'pwsh.exe',
+    shellArguments: ['-NoLogo'],
+    workingDirectory: null,
+    dockerEndpoint: null,
+    dockerImage: null,
+    enabled: true,
+  }
+}
+
+export function createConnectorDefinition(): ConnectorDefinition {
+  const id = uniqueId('connector')
+  return {
+    id,
+    displayName: `New connector ${id.slice(-4)}`,
+    kind: 'shell',
+    defaultModel: null,
+    enabled: true,
+  }
+}
+
+function clampDimension(value: number | undefined, fallback: number): number {
+  if (!value || Number.isNaN(value)) {
+    return fallback
+  }
+
+  return Math.min(240, Math.max(24, Math.round(value)))
+}
+
+function pickValue(values: string[], current: string | undefined): string {
+  if (current && values.includes(current)) {
+    return current
+  }
+
+  return values[0] ?? ''
+}
+
+function uniqueId(prefix: string): string {
+  const suffix =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().slice(0, 8)
+      : Math.random().toString(36).slice(2, 10)
+
+  return `${prefix}-${suffix}`
+}

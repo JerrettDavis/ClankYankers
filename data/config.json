@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "backplanes": [
+    {
+      "id": "local",
+      "displayName": "Local",
+      "kind": "local",
+      "enabled": true
+    },
+    {
+      "id": "docker",
+      "displayName": "Docker",
+      "kind": "docker",
+      "enabled": true
+    }
+  ],
+  "hosts": [
+    {
+      "id": "local-host",
+      "backplaneId": "local",
+      "displayName": "This machine",
+      "shellExecutable": "pwsh.exe",
+      "shellArguments": [
+        "-NoLogo"
+      ],
+      "workingDirectory": null,
+      "dockerEndpoint": null,
+      "dockerImage": null,
+      "enabled": true
+    },
+    {
+      "id": "docker-local",
+      "backplaneId": "docker",
+      "displayName": "Local Docker daemon",
+      "shellExecutable": "/bin/sh",
+      "shellArguments": [],
+      "workingDirectory": "/workspace",
+      "dockerEndpoint": "npipe://./pipe/docker_engine",
+      "dockerImage": "alpine:3.20",
+      "enabled": true
+    }
+  ],
+  "connectors": [
+    {
+      "id": "shell",
+      "displayName": "Shell",
+      "kind": "shell",
+      "defaultModel": null,
+      "enabled": true
+    },
+    {
+      "id": "ollama",
+      "displayName": "Ollama qwen3.5:9b",
+      "kind": "ollama",
+      "defaultModel": "qwen3.5:9b",
+      "enabled": true
+    }
+  ]
+}

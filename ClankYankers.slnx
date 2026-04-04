@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/server/">
+    <Project Path="apps/server/ClankYankers.Server/ClankYankers.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ClankYankers.Server.IntegrationTests/ClankYankers.Server.IntegrationTests.csproj" />
+    <Project Path="tests/ClankYankers.Server.UnitTests/ClankYankers.Server.UnitTests.csproj" />
+  </Folder>
+</Solution>

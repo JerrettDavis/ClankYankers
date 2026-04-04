@@ -1,0 +1,98 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <RestoreSuccess Condition=" '$(RestoreSuccess)' == '' ">True</RestoreSuccess>
+    <RestoreTool Condition=" '$(RestoreTool)' == '' ">NuGet</RestoreTool>
+    <ProjectAssetsFile Condition=" '$(ProjectAssetsFile)' == '' ">$(MSBuildThisFileDirectory)project.assets.json</ProjectAssetsFile>
+    <NuGetPackageRoot Condition=" '$(NuGetPackageRoot)' == '' ">$(UserProfile)\.nuget\packages\</NuGetPackageRoot>
+    <NuGetPackageFolders Condition=" '$(NuGetPackageFolders)' == '' ">C:\Users\jd\.nuget\packages\;C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages</NuGetPackageFolders>
+    <NuGetProjectStyle Condition=" '$(NuGetProjectStyle)' == '' ">PackageReference</NuGetProjectStyle>
+    <NuGetToolVersion Condition=" '$(NuGetToolVersion)' == '' ">7.0.0</NuGetToolVersion>
+  </PropertyGroup>
+  <ItemGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <SourceRoot Include="C:\Users\jd\.nuget\packages\" />
+    <SourceRoot Include="C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\arm64\OpenConsole.exe" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\arm64\OpenConsole.exe')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\conpty\arm64\OpenConsole.exe</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\arm64\conpty.dll" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\arm64\conpty.dll')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\conpty\arm64\conpty.dll</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x64\OpenConsole.exe" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x64\OpenConsole.exe')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\conpty\x64\OpenConsole.exe</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x64\conpty.dll" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x64\conpty.dll')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\conpty\x64\conpty.dll</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x86\OpenConsole.exe" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x86\OpenConsole.exe')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\conpty\x86\OpenConsole.exe</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x86\conpty.dll" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\conpty\x86\conpty.dll')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\conpty\x86\conpty.dll</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty-agent.exe" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty-agent.exe')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\winpty\winpty-agent.exe</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty-debugserver.exe" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty-debugserver.exe')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\winpty\winpty-debugserver.exe</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty.dll" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty.dll')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\winpty\winpty.dll</Link>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty.exe" Condition="Exists('$(NuGetPackageRoot)pty\1.0.3\contentFiles\any\netstandard2.1\deps\winpty\winpty.exe')">
+      <NuGetPackageId>PTY</NuGetPackageId>
+      <NuGetPackageVersion>1.0.3</NuGetPackageVersion>
+      <NuGetItemType>Content</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>deps\winpty\winpty.exe</Link>
+    </Content>
+  </ItemGroup>
+</Project>
