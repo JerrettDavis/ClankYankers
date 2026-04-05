@@ -12,12 +12,13 @@ type ConnectionState = 'connecting' | 'live' | 'closed' | 'error'
 type ThemeMode = 'light' | 'dark'
 
 interface TerminalPaneProps {
+  label?: string
   sessionId: string
-  onSessionMessage?: (message: TerminalServerMessage) => void
+  onSessionMessage?: (sessionId: string, message: TerminalServerMessage) => void
   themeMode: ThemeMode
 }
 
-export function TerminalPane({ sessionId, onSessionMessage, themeMode }: TerminalPaneProps) {
+export function TerminalPane({ label, sessionId, onSessionMessage, themeMode }: TerminalPaneProps) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -164,7 +165,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       }
 
       const message = JSON.parse(event.data) as TerminalServerMessage
-      onSessionMessageRef.current?.(message)
+      onSessionMessageRef.current?.(sessionId, message)
 
       if (message.type === 'output' && typeof message.data === 'string') {
         const output = message.data
@@ -247,7 +248,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       <div className="terminal-shell__bar">
         <div className="terminal-shell__meta">
           <span className="terminal-shell__label">Docked console</span>
-          <strong>{sessionId}</strong>
+          <strong title={sessionId}>{label ?? sessionId}</strong>
         </div>
         <div className={`terminal-connection terminal-connection--${connectionState}`}>
           {connectionLabel[connectionState]}

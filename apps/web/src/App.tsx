@@ -15,6 +15,20 @@ import {
   parseArgumentList,
   type LaunchDraft,
 } from './lib/config'
+import {
+  closeWorkspaceTab,
+  createInitialWorkspace,
+  ensureSecondarySession,
+  focusWorkspaceTab,
+  getSessionTabId,
+  isSessionTab,
+  openSessionTab,
+  orchestrationTabId,
+  setWorkspaceLayout,
+  syncWorkspaceState,
+  type WorkspaceLayout,
+  type WorkspaceTab,
+} from './lib/workspace'
 import type {
   AppConfig,
   BackplaneDefinition,
@@ -38,7 +52,7 @@ function App() {
     cols: 120,
     rows: 34,
   })
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [workspace, setWorkspace] = useState(() => createInitialWorkspace([]))
   const [isBooting, setIsBooting] = useState(true)
   const [isCreatingSession, setIsCreatingSession] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
@@ -69,8 +83,8 @@ function App() {
       setSavedConfig(state.config)
       setConfigDraft(state.config)
       setSessions(state.sessions)
+      setWorkspace(createInitialWorkspace(state.sessions))
       setLaunchDraft(coerceLaunchDraft(state.config))
-      setActiveSessionId(state.sessions[0]?.id ?? null)
       setConfigDirty(false)
       setStatusMessage('Control deck synchronized with the local runtime.')
     } catch (error) {
@@ -93,12 +107,8 @@ function App() {
   }, [savedConfig])
 
   useEffect(() => {
-    if (activeSessionId && sessions.some((session) => session.id === activeSessionId)) {
-      return
-    }
-
-    setActiveSessionId(sessions[0]?.id ?? null)
-  }, [activeSessionId, sessions])
+    setWorkspace((current) => syncWorkspaceState(current, sessions))
+  }, [sessions])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -122,7 +132,21 @@ function App() {
     () => (savedConfig ? getEnabledConnectors(savedConfig) : []),
     [savedConfig],
   )
-  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null
+  const sessionMap = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions])
+  const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0] ?? null
+  const secondaryTab =
+    workspace.secondaryTabId !== null
+      ? workspace.tabs.find((tab) => tab.id === workspace.secondaryTabId) ?? null
+      : null
+  const activeSession = isSessionTab(activeTab) ? (sessionMap.get(activeTab.sessionId) ?? null) : null
+  const secondarySession = isSessionTab(secondaryTab) ? (sessionMap.get(secondaryTab.sessionId) ?? null) : null
+  const workspaceTabOptions = useMemo(
+    () => [
+      { label: 'Orchestration', tabId: orchestrationTabId },
+      ...sessions.map((session) => ({ label: session.id, tabId: getSessionTabId(session.id) })),
+    ],
+    [sessions],
+  )
 
   const updateLaunchDraft = <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) => {
     if (!savedConfig) {
@@ -159,7 +183,7 @@ function App() {
       setErrorMessage(null)
       const createdSession = await createSession(launchDraft)
       setSessions((current) => [createdSession, ...current])
-      setActiveSessionId(createdSession.id)
+      setWorkspace((current) => openSessionTab(current, createdSession))
       setStatusMessage(`Session ${createdSession.id} is live.`)
     } catch (error) {
       setErrorMessage(asMessage(error))
@@ -168,17 +192,18 @@ function App() {
     }
   }
 
-  const handleStopSession = async () => {
-    if (!activeSession) {
+  const handleStopSession = async (sessionId: string) => {
+    const session = sessionMap.get(sessionId)
+    if (!session) {
       return
     }
 
     try {
       setIsStoppingSession(true)
       setErrorMessage(null)
-      await stopSession(activeSession.id)
+      await stopSession(session.id)
       await refreshSessions()
-      setStatusMessage(`Stop requested for ${activeSession.id}.`)
+      setStatusMessage(`Stop requested for ${session.id}.`)
     } catch (error) {
       setErrorMessage(asMessage(error))
     } finally {
@@ -218,15 +243,11 @@ function App() {
   }
 
   const handleSessionMessage = useCallback(
-    (message: TerminalServerMessage) => {
-      if (!activeSessionId) {
-        return
-      }
-
+    (sessionId: string, message: TerminalServerMessage) => {
       if (message.type === 'state' && message.state) {
         setSessions((current) =>
           current.map((session) =>
-            session.id === activeSessionId
+            session.id === sessionId
               ? {
                   ...session,
                   state: normalizeSessionState(message.state),
@@ -240,7 +261,7 @@ function App() {
       if (message.type === 'exit') {
         setSessions((current) =>
           current.map((session) =>
-            session.id === activeSessionId
+            session.id === sessionId
               ? {
                   ...session,
                   state: normalizeSessionState(message.state),
@@ -256,7 +277,7 @@ function App() {
       if (message.type === 'error') {
         setSessions((current) =>
           current.map((session) =>
-            session.id === activeSessionId
+            session.id === sessionId
               ? {
                   ...session,
                   state: normalizeSessionState(message.state),
@@ -269,8 +290,62 @@ function App() {
         setErrorMessage(message.message ?? 'Terminal session reported an error.')
       }
     },
-    [activeSessionId],
+    [],
   )
+
+  const handleOpenSession = (session: SessionSummary, target: 'primary' | 'secondary' = 'primary') => {
+    setWorkspace((current) => openSessionTab(current, session, { target }))
+    setStatusMessage(
+      target === 'secondary' ? `Comparing ${session.id} in a split pane.` : `Focused ${session.id} in the workspace.`,
+    )
+  }
+
+  const handleOpenOrchestration = () => {
+    setWorkspace((current) => focusWorkspaceTab(current, orchestrationTabId))
+    setStatusMessage('Orchestration board is active.')
+  }
+
+  const handleCloseWorkspaceTab = (tabId: string) => {
+    setWorkspace((current) => closeWorkspaceTab(current, tabId))
+  }
+
+  const handleSetWorkspaceLayout = (layout: WorkspaceLayout) => {
+    setWorkspace((current) => {
+      if (layout === 'single') {
+        return setWorkspaceLayout(current, layout)
+      }
+
+      return setWorkspaceLayout(ensureSecondarySession(current, sessions), layout)
+    })
+  }
+
+  const handleSelectPaneTab = (target: 'primary' | 'secondary', tabId: string) => {
+    if (tabId === orchestrationTabId) {
+      setWorkspace((current) => {
+        if (target === 'primary') {
+          return focusWorkspaceTab(current, orchestrationTabId)
+        }
+
+        if (current.activeTabId === orchestrationTabId) {
+          return current
+        }
+
+        return {
+          ...current,
+          layout: current.layout === 'single' ? 'split-vertical' : current.layout,
+          secondaryTabId: orchestrationTabId,
+        }
+      })
+      return
+    }
+
+    const session = sessionMap.get(tabId.replace(/^session:/, ''))
+    if (!session) {
+      return
+    }
+
+    handleOpenSession(session, target)
+  }
 
   if (isBooting) {
     return (
@@ -322,8 +397,8 @@ function App() {
                 <strong>{sessions.length}</strong>
               </div>
               <div className="status-chip">
-                <span className="status-chip__label">System theme</span>
-                <strong>{themeMode === 'dark' ? 'Dark mode' : 'Light mode'}</strong>
+                <span className="status-chip__label">Workspace</span>
+                <strong>{formatWorkspaceLayout(workspace.layout)}</strong>
               </div>
             </div>
             <div className="header-actions">
@@ -439,7 +514,7 @@ function App() {
               </form>
             </section>
 
-            <details className="panel panel--settings" open>
+            <details className="panel panel--settings">
               <summary>
                 <div>
                   <p className="eyebrow">Configuration manifest</p>
@@ -559,16 +634,16 @@ function App() {
                   {sessions.map((session) => (
                     <button
                       key={session.id}
-                      className={`session-card${session.id === activeSessionId ? ' is-active' : ''}`}
-                      onClick={() => setActiveSessionId(session.id)}
+                      className={`session-card${activeSession?.id === session.id ? ' is-active' : ''}`}
+                      onClick={() => handleOpenSession(session)}
                       role="tab"
-                      aria-selected={session.id === activeSessionId}
+                      aria-selected={activeSession?.id === session.id}
                       type="button"
                     >
                       <span className={`session-state session-state--${session.state.toLowerCase()}`}>
                         {session.state}
                       </span>
-                      <strong>{session.id}</strong>
+                      <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
                       <span>{session.displayCommand}</span>
                     </button>
                   ))}
@@ -588,83 +663,288 @@ function App() {
           <section className={`stage${activeSession ? ' stage--active' : ' stage--idle'}`} id="main-content">
             <div className="stage__header">
               <div>
-                <p className="eyebrow">Terminal stage</p>
-                <h2>{activeSession ? activeSession.id : 'Choose or launch a session'}</h2>
+                <p className="eyebrow">Command studio</p>
+                <h2>Workspace</h2>
                 <p className="stage__lede">
-                  {activeSession
-                    ? 'A contained live console with stable internal scrolling and session-aware controls.'
-                    : 'Launch a session to attach a docked console without leaving the workspace.'}
+                  Tabs manage long-lived sessions, while split panes handle compare and monitor flows
+                  without breaking terminal fidelity.
+                </p>
+                <p className="stage__context">
+                  Active: {formatWorkspaceLabel(activeTab?.title ?? 'Orchestration')}
+                  {secondaryTab ? ` · Compare: ${formatWorkspaceLabel(secondaryTab.title)}` : ''}
                 </p>
               </div>
 
-              {activeSession ? (
-                <div className="stage__actions">
-                  <span className={`session-state session-state--${activeSession.state.toLowerCase()}`}>
-                    {activeSession.state}
-                  </span>
-                  <button
-                    className="button button--ghost"
-                    onClick={handleStopSession}
-                    disabled={isStoppingSession || activeSession.state !== 'Running'}
-                    type="button"
-                  >
-                    {isStoppingSession ? 'Stopping…' : 'Stop session'}
-                  </button>
-                </div>
-              ) : (
-                null
-              )}
+              <div className="stage__actions">
+                <button className="button button--ghost" onClick={handleOpenOrchestration} type="button">
+                  Orchestration
+                </button>
+                <button
+                  className="button button--ghost"
+                  onClick={() => handleSetWorkspaceLayout('split-vertical')}
+                  disabled={sessions.length < 2 && workspace.secondaryTabId === null}
+                  type="button"
+                >
+                  Split vertical
+                </button>
+                <button
+                  className="button button--ghost"
+                  onClick={() => handleSetWorkspaceLayout('split-horizontal')}
+                  disabled={sessions.length < 2 && workspace.secondaryTabId === null}
+                  type="button"
+                >
+                  Split horizontal
+                </button>
+                <button
+                  className="button button--ghost"
+                  onClick={() => handleSetWorkspaceLayout('single')}
+                  disabled={workspace.layout === 'single'}
+                  type="button"
+                >
+                  Single pane
+                </button>
+              </div>
             </div>
 
-            {activeSession ? (
-              <div className="stage__body">
-                <dl className="session-meta">
-                  <div>
-                    <dt>Backplane</dt>
-                    <dd>{activeSession.backplaneId}</dd>
+            <div className="stage__body stage__body--workspace">
+              <div className="workspace-tabs" role="tablist" aria-label="Workspace tabs">
+                {workspace.tabs.map((tab) => (
+                  <div
+                    key={tab.id}
+                    className={`workspace-tab${tab.id === workspace.activeTabId ? ' workspace-tab--active' : ''}`}
+                  >
+                    <button
+                      className="workspace-tab__trigger"
+                      onClick={() => setWorkspace((current) => focusWorkspaceTab(current, tab.id))}
+                      role="tab"
+                      aria-selected={tab.id === workspace.activeTabId}
+                      type="button"
+                    >
+                      <span className="workspace-tab__title" title={tab.title}>
+                        {formatWorkspaceLabel(tab.title)}
+                      </span>
+                      <span className="workspace-tab__kind">
+                        {tab.kind === 'orchestration' ? 'board' : 'session'}
+                      </span>
+                    </button>
+                    {tab.closable ? (
+                      <button
+                        className="workspace-tab__close"
+                        onClick={() => handleCloseWorkspaceTab(tab.id)}
+                        aria-label={`Close ${tab.title}`}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    ) : null}
                   </div>
-                  <div>
-                    <dt>Host</dt>
-                    <dd>{activeSession.hostId}</dd>
-                  </div>
-                  <div>
-                    <dt>Connector</dt>
-                    <dd>{activeSession.connectorId}</dd>
-                  </div>
-                  <div>
-                    <dt>Command</dt>
-                    <dd>{activeSession.displayCommand}</dd>
-                  </div>
-                </dl>
+                ))}
+              </div>
 
-                <div className="stage__dock">
-                  <TerminalPane
-                    key={activeSession.id}
-                    sessionId={activeSession.id}
-                    onSessionMessage={handleSessionMessage}
+              <div className={`workspace-canvas workspace-canvas--${workspace.layout}`}>
+                <WorkspacePaneView
+                  label="Primary"
+                  session={activeSession}
+                  sessions={sessions}
+                  tab={activeTab}
+                  tabOptions={workspaceTabOptions}
+                  target="primary"
+                  themeMode={themeMode}
+                  isStoppingSession={isStoppingSession}
+                  onOpenSession={handleOpenSession}
+                  onSelectTab={handleSelectPaneTab}
+                  onSessionMessage={handleSessionMessage}
+                  onStopSession={handleStopSession}
+                />
+
+                {workspace.layout !== 'single' && secondaryTab ? (
+                  <WorkspacePaneView
+                    label="Compare"
+                    session={secondarySession}
+                    sessions={sessions}
+                    tab={secondaryTab}
+                    tabOptions={workspaceTabOptions}
+                    target="secondary"
                     themeMode={themeMode}
+                    isStoppingSession={isStoppingSession}
+                    onOpenSession={handleOpenSession}
+                    onSelectTab={handleSelectPaneTab}
+                    onSessionMessage={handleSessionMessage}
+                    onStopSession={handleStopSession}
                   />
-                </div>
+                ) : null}
               </div>
-            ) : (
-              <div className="empty-stage">
-                <p className="eyebrow">No live sessions yet</p>
-                <h3>Launch a session and the dock snaps into place.</h3>
-                <p>
-                  Start with <code>shell</code> on <code>local-host</code>, then compare Docker and
-                  Ollama without losing the feel of a native console.
-                </p>
-                <div className="empty-stage__commands">
-                  <span>pwd</span>
-                  <span>ls</span>
-                  <span>echo hello</span>
-                </div>
-              </div>
-            )}
+            </div>
           </section>
         </main>
       </div>
     </>
+  )
+}
+
+interface WorkspacePaneViewProps {
+  isStoppingSession: boolean
+  label: string
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  onSelectTab: (target: 'primary' | 'secondary', tabId: string) => void
+  onSessionMessage: (sessionId: string, message: TerminalServerMessage) => void
+  onStopSession: (sessionId: string) => void
+  session: SessionSummary | null
+  sessions: SessionSummary[]
+  tab: WorkspaceTab | null
+  tabOptions: Array<{ label: string; tabId: string }>
+  target: 'primary' | 'secondary'
+  themeMode: ThemeMode
+}
+
+function WorkspacePaneView({
+  isStoppingSession,
+  label,
+  onOpenSession,
+  onSelectTab,
+  onSessionMessage,
+  onStopSession,
+  session,
+  sessions,
+  tab,
+  tabOptions,
+  target,
+  themeMode,
+}: WorkspacePaneViewProps) {
+  return (
+    <section className={`workspace-pane workspace-pane--${target}`}>
+      <header className="workspace-pane__header">
+        <div className="workspace-pane__meta">
+          <span className="workspace-pane__eyebrow">{label}</span>
+          <strong title={tab?.title ?? 'Orchestration'}>{formatWorkspaceLabel(tab?.title ?? 'Orchestration')}</strong>
+        </div>
+        <div className="workspace-pane__controls">
+          <label className="workspace-pane__picker">
+            <span>View</span>
+            <select value={tab?.id ?? orchestrationTabId} onChange={(event) => onSelectTab(target, event.target.value)}>
+              {tabOptions.map((option) => (
+                <option key={option.tabId} value={option.tabId}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {session ? (
+            <>
+              <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
+              <button
+                className="button button--ghost"
+                onClick={() => onStopSession(session.id)}
+                disabled={isStoppingSession || session.state !== 'Running'}
+                type="button"
+              >
+                {isStoppingSession ? 'Stopping…' : 'Stop'}
+              </button>
+            </>
+          ) : null}
+        </div>
+      </header>
+
+      {isSessionTab(tab) && session ? (
+        <div className="workspace-pane__body">
+          <dl className="session-meta">
+            <div>
+              <dt>Backplane</dt>
+              <dd>{session.backplaneId}</dd>
+            </div>
+            <div>
+              <dt>Host</dt>
+              <dd>{session.hostId}</dd>
+            </div>
+            <div>
+              <dt>Connector</dt>
+              <dd>{session.connectorId}</dd>
+            </div>
+            <div>
+              <dt>Command</dt>
+              <dd>{session.displayCommand}</dd>
+            </div>
+          </dl>
+
+          <div className="stage__dock workspace-pane__dock">
+            <TerminalPane
+              label={formatWorkspaceLabel(session.id)}
+              sessionId={session.id}
+              onSessionMessage={onSessionMessage}
+              themeMode={themeMode}
+            />
+          </div>
+        </div>
+      ) : (
+        <OrchestrationBoard onOpenSession={onOpenSession} sessions={sessions} target={target} />
+      )}
+    </section>
+  )
+}
+
+interface OrchestrationBoardProps {
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  sessions: SessionSummary[]
+  target: 'primary' | 'secondary'
+}
+
+function OrchestrationBoard({ onOpenSession, sessions, target }: OrchestrationBoardProps) {
+  const runningCount = sessions.filter((session) => session.state === 'Running').length
+  const attentionCount = sessions.filter((session) => session.state === 'Failed').length
+
+  return (
+    <div className="workspace-board">
+      <div className="workspace-board__stats">
+        <article className="workspace-stat">
+          <span className="workspace-stat__label">Live sessions</span>
+          <strong>{sessions.length}</strong>
+        </article>
+        <article className="workspace-stat">
+          <span className="workspace-stat__label">Running now</span>
+          <strong>{runningCount}</strong>
+        </article>
+        <article className="workspace-stat">
+          <span className="workspace-stat__label">Needs attention</span>
+          <strong>{attentionCount}</strong>
+        </article>
+      </div>
+
+      {sessions.length > 0 ? (
+        <div className="orchestration-list">
+          {sessions.map((session) => (
+            <article key={session.id} className="orchestration-item">
+              <div className="orchestration-item__meta">
+                <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
+                <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
+                <p>{session.displayCommand}</p>
+              </div>
+              <div className="orchestration-item__actions">
+                <button className="button button--ghost" onClick={() => onOpenSession(session, target)} type="button">
+                  Open
+                </button>
+                <button className="button button--ghost" onClick={() => onOpenSession(session, 'secondary')} type="button">
+                  Compare
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-stage">
+          <p className="eyebrow">No live sessions yet</p>
+          <h3>Launch a session and build a workspace.</h3>
+          <p>
+            Start with <code>shell</code> on <code>local-host</code>, then open compare panes to watch
+            multiple runtimes side by side.
+          </p>
+          <div className="empty-stage__commands">
+            <span>pwsh</span>
+            <span>ollama run</span>
+            <span>docker exec</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -908,6 +1188,25 @@ function asMessage(error: unknown): string {
   }
 
   return 'An unexpected error interrupted the control deck.'
+}
+
+function formatWorkspaceLayout(layout: WorkspaceLayout): string {
+  switch (layout) {
+    case 'split-horizontal':
+      return 'Split rows'
+    case 'split-vertical':
+      return 'Split columns'
+    default:
+      return 'Single pane'
+  }
+}
+
+function formatWorkspaceLabel(value: string): string {
+  if (value.length <= 22) {
+    return value
+  }
+
+  return `${value.slice(0, 8)}…${value.slice(-8)}`
 }
 
 function useSystemTheme(): ThemeMode {

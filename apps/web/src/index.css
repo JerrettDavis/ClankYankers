@@ -319,7 +319,7 @@ code {
   min-height: 0;
   block-size: 100%;
   align-content: start;
-  overflow-y: auto;
+  overflow: hidden;
   padding-right: 0.2rem;
 }
 
@@ -563,12 +563,16 @@ code {
 }
 
 .panel--settings {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: block;
   min-height: 0;
-  block-size: 100%;
   padding: 0.85rem;
   overflow: hidden;
+}
+
+.panel--settings[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: 100%;
 }
 
 .panel--settings summary {
@@ -708,11 +712,248 @@ code {
   color: color-mix(in oklab, var(--stage-text) 80%, transparent);
 }
 
+.stage__context {
+  margin: 0;
+  color: color-mix(in oklab, var(--stage-text) 62%, transparent);
+  font-size: 0.86rem;
+}
+
 .stage__body {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-lg);
+}
+
+.stage__body--workspace {
+  gap: var(--space-md);
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 0.55rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+}
+
+.workspace-tab {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+  max-width: min(20rem, 32vw);
+  border: 1px solid color-mix(in oklab, var(--terminal-line) 88%, white);
+  background: color-mix(in oklab, var(--terminal-raised) 72%, transparent);
+}
+
+.workspace-tab--active {
+  border-color: color-mix(in oklab, var(--accent-0) 32%, var(--terminal-line));
+  background: color-mix(in oklab, var(--accent-0) 8%, var(--terminal-raised));
+}
+
+.workspace-tab__trigger,
+.workspace-tab__close {
+  border: 0;
+  background: transparent;
+  color: var(--stage-text);
+}
+
+.workspace-tab__trigger {
+  min-width: 0;
+  display: grid;
+  gap: 0.08rem;
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+}
+
+.workspace-tab__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.workspace-tab__kind,
+.workspace-pane__eyebrow,
+.workspace-stat__label {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.66rem;
+  color: color-mix(in oklab, var(--stage-text) 58%, transparent);
+}
+
+.workspace-tab__close {
+  padding: 0 0.7rem;
+  font-size: 1rem;
+}
+
+.stage__actions .button,
+.workspace-pane__controls .button,
+.orchestration-item__actions .button {
+  min-height: 2.4rem;
+  padding: 0.58rem 0.8rem;
+}
+
+.workspace-canvas {
+  min-height: 0;
+  display: grid;
+  gap: var(--space-md);
+}
+
+.workspace-canvas--single {
+  grid-template-columns: 1fr;
+}
+
+.workspace-canvas--split-vertical {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-canvas--split-horizontal {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-pane {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid color-mix(in oklab, var(--terminal-line) 92%, white);
+  background: linear-gradient(180deg, var(--terminal-raised), var(--terminal-bg));
+  overflow: hidden;
+}
+
+.workspace-pane__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--terminal-line) 82%, white);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.workspace-pane__meta {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.workspace-pane__meta strong {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--terminal-text);
+  overflow-wrap: anywhere;
+}
+
+.workspace-pane__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.workspace-pane__picker {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.workspace-pane__picker span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: color-mix(in oklab, var(--terminal-text) 58%, transparent);
+}
+
+.workspace-pane__picker select {
+  min-height: 2.4rem;
+  min-width: 11rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--terminal-line) 90%, white);
+  background: color-mix(in oklab, var(--terminal-raised) 78%, transparent);
+  color: var(--terminal-text);
+}
+
+.workspace-pane__body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: 0 1rem 1rem;
+}
+
+.workspace-pane__dock {
+  min-height: 0;
+}
+
+.workspace-board {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-md);
+  padding: 0 1rem 1rem;
+}
+
+.workspace-board__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.workspace-stat {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(239, 229, 212, 0.12);
+  background: color-mix(in oklab, var(--stage-raised) 82%, transparent);
+}
+
+.workspace-stat strong {
+  font-size: 1.3rem;
+  color: var(--stage-text);
+}
+
+.orchestration-list {
+  min-height: 0;
+  display: grid;
+  gap: 0.75rem;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.orchestration-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(239, 229, 212, 0.12);
+  background: color-mix(in oklab, var(--stage-raised) 80%, transparent);
+}
+
+.orchestration-item__meta {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.orchestration-item__meta strong {
+  font-size: 1rem;
+  color: var(--stage-text);
+  overflow-wrap: anywhere;
+}
+
+.orchestration-item__meta p {
+  margin: 0;
+  color: color-mix(in oklab, var(--stage-text) 78%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.orchestration-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
 }
 
 .stage__dock {
@@ -964,6 +1205,15 @@ code {
   .stage {
     min-height: 0;
   }
+
+  .workspace-canvas--split-vertical {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(18rem, 1fr));
+  }
+
+  .workspace-board__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1020,6 +1270,29 @@ code {
     width: 100%;
   }
 
+  .workspace-board__stats,
+  .workspace-canvas--split-horizontal,
+  .workspace-canvas--split-vertical {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .workspace-pane__header,
+  .orchestration-item {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .workspace-pane__controls,
+  .orchestration-item__actions {
+    justify-content: stretch;
+  }
+
+  .workspace-pane__picker select {
+    min-width: 0;
+    width: 100%;
+  }
+
   .stage,
   .panel--settings,
   .launch-form,
@@ -1047,5 +1320,10 @@ code {
     max-block-size: none;
     overflow: visible;
     padding-right: 0;
+  }
+
+  .workspace-board,
+  .workspace-pane__body {
+    padding-inline: 0;
   }
 }
