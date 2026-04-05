@@ -45,14 +45,36 @@
       "id": "shell",
       "displayName": "Shell",
       "kind": "shell",
+      "launchCommand": null,
+      "launchArguments": [],
       "defaultModel": null,
+      "defaultPermissionMode": null,
+      "allowedTools": [],
+      "skipPermissions": false,
       "enabled": true
     },
     {
       "id": "ollama",
       "displayName": "Ollama qwen3.5:9b",
       "kind": "ollama",
+      "launchCommand": "ollama",
+      "launchArguments": [],
       "defaultModel": "qwen3.5:9b",
+      "defaultPermissionMode": null,
+      "allowedTools": [],
+      "skipPermissions": false,
+      "enabled": true
+    },
+    {
+      "id": "claude",
+      "displayName": "Claude Code",
+      "kind": "claude",
+      "launchCommand": "claude",
+      "launchArguments": [],
+      "defaultModel": null,
+      "defaultPermissionMode": "default",
+      "allowedTools": [],
+      "skipPermissions": false,
       "enabled": true
     }
   ]

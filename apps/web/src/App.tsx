@@ -8,6 +8,7 @@ import {
   createConnectorDefinition,
   createHostConfig,
   formatArgumentList,
+  getConnector,
   getEnabledBackplanes,
   getEnabledConnectors,
   getEnabledHosts,
@@ -51,6 +52,7 @@ function App() {
     backplaneId: '',
     hostId: '',
     connectorId: '',
+    model: null,
     cols: 120,
     rows: 34,
   })
@@ -142,6 +144,10 @@ function App() {
     () => (savedConfig ? getEnabledConnectors(savedConfig) : []),
     [savedConfig],
   )
+  const selectedConnector = useMemo(
+    () => (savedConfig ? getConnector(savedConfig, launchDraft.connectorId) ?? null : null),
+    [launchDraft.connectorId, savedConfig],
+  )
   const sessionMap = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions])
   const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0] ?? null
   const secondaryTab =
@@ -164,12 +170,21 @@ function App() {
       return
     }
 
-    setLaunchDraft((current) =>
-      coerceLaunchDraft(savedConfig, {
+    setLaunchDraft((current) => {
+      if (key === 'connectorId') {
+        const connector = getConnector(savedConfig, String(value))
+        return coerceLaunchDraft(savedConfig, {
+          ...current,
+          connectorId: String(value),
+          ...getConnectorLaunchDefaults(connector),
+        })
+      }
+
+      return coerceLaunchDraft(savedConfig, {
         ...current,
         [key]: value,
-      }),
-    )
+      })
+    })
   }
 
   const updateConfigDraft = (updater: (current: AppConfig) => AppConfig) => {
@@ -508,6 +523,35 @@ function App() {
                   </select>
                 </label>
 
+                {selectedConnector ? (
+                  <>
+                    <div className="field field--hint">
+                      <span>Launch target</span>
+                      <p data-testid="launch-connector-command">
+                        {formatConnectorLaunchTarget(selectedConnector)}
+                      </p>
+                    </div>
+
+                    {selectedConnector.kind.toLowerCase() !== 'shell' ? (
+                      <div className="launch-overrides" data-testid="launch-overrides">
+                        <label className="field">
+                          <span>Model override</span>
+                          <input
+                            data-testid="launch-model"
+                            placeholder={selectedConnector.defaultModel ?? 'Use connector default'}
+                            value={launchDraft.model ?? ''}
+                            onChange={(event) => updateLaunchDraft('model', event.target.value.trim() || null)}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <p className="field-note">
+                        Uses the selected host shell.
+                      </p>
+                    )}
+                  </>
+                ) : null}
+
                 <div className="dimension-grid">
                   <label className="field">
                     <span>Columns</span>
@@ -538,6 +582,11 @@ function App() {
                   {isCreatingSession ? 'Launching…' : 'Launch session'}
                 </button>
               </form>
+              <datalist id="permission-mode-options">
+                {permissionModes.map((mode) => (
+                  <option key={mode} value={mode} />
+                ))}
+              </datalist>
             </section>
 
             <details className="panel panel--settings" data-testid="config-panel">
@@ -1166,6 +1215,9 @@ interface ConnectorEditorProps {
 }
 
 function ConnectorEditor({ connector, onChange, onRemove }: ConnectorEditorProps) {
+  const connectorKind = connector.kind.trim().toLowerCase()
+  const isShellConnector = connectorKind === 'shell'
+
   return (
     <article className="config-card" data-testid={`connector-card-${connector.id}`}>
       <header className="config-card__header">
@@ -1196,15 +1248,78 @@ function ConnectorEditor({ connector, onChange, onRemove }: ConnectorEditorProps
             onChange={(event) => onChange({ ...connector, kind: event.target.value })}
           />
         </label>
-        <label className="field">
-          <span>Default model</span>
-          <input
-            value={connector.defaultModel ?? ''}
-            onChange={(event) =>
-              onChange({ ...connector, defaultModel: event.target.value.trim() || null })
-            }
-          />
-        </label>
+
+        {isShellConnector ? (
+          <div className="field field--hint">
+            <span>Launch target</span>
+            <p>Uses the selected host&apos;s shell executable directly.</p>
+          </div>
+        ) : (
+          <>
+            <label className="field">
+              <span>Command</span>
+              <input
+                value={connector.launchCommand ?? ''}
+                onChange={(event) =>
+                  onChange({ ...connector, launchCommand: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Base arguments</span>
+              <input
+                placeholder={connectorKind === 'ollama' ? '--verbose' : '--verbose, --json'}
+                value={formatArgumentList(connector.launchArguments)}
+                onChange={(event) =>
+                  onChange({ ...connector, launchArguments: parseArgumentList(event.target.value) })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Default model</span>
+              <input
+                value={connector.defaultModel ?? ''}
+                onChange={(event) =>
+                  onChange({ ...connector, defaultModel: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            {connectorKind === 'claude' ? (
+              <>
+                <label className="field">
+                  <span>Permission mode</span>
+                  <input
+                    list="permission-mode-options"
+                    value={connector.defaultPermissionMode ?? ''}
+                    onChange={(event) =>
+                      onChange({ ...connector, defaultPermissionMode: event.target.value.trim() || null })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span>Allowed tools</span>
+                  <input
+                    placeholder="Read, Edit, Bash(ls *)"
+                    value={formatArgumentList(connector.allowedTools)}
+                    onChange={(event) =>
+                      onChange({ ...connector, allowedTools: parseArgumentList(event.target.value) })
+                    }
+                  />
+                </label>
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={connector.skipPermissions}
+                    onChange={(event) =>
+                      onChange({ ...connector, skipPermissions: event.target.checked })
+                    }
+                  />
+                  <span>Dangerously skip permissions</span>
+                </label>
+              </>
+            ) : null}
+          </>
+        )}
         <label className="toggle">
           <input
             type="checkbox"
@@ -1248,6 +1363,29 @@ function formatWorkspaceLayout(layout: WorkspaceLayout): string {
   }
 }
 
+function getConnectorLaunchDefaults(connector?: ConnectorDefinition | null): Pick<
+  LaunchDraft,
+  'model'
+> {
+  return {
+    model: connector?.defaultModel ?? null,
+  }
+}
+
+function formatConnectorLaunchTarget(connector: ConnectorDefinition): string {
+  if (connector.kind.toLowerCase() === 'shell') {
+    return 'Selected host shell'
+  }
+
+  const command = connector.launchCommand ?? connector.kind
+  const argumentsList =
+    connector.kind.toLowerCase() === 'ollama'
+      ? ['run', ...connector.launchArguments]
+      : connector.launchArguments
+  const argumentsText = argumentsList.join(' ')
+  return argumentsText ? `${command} ${argumentsText}` : command
+}
+
 function formatWorkspaceLabel(value: string): string {
   if (value.length <= 22) {
     return value
@@ -1255,6 +1393,8 @@ function formatWorkspaceLabel(value: string): string {
 
   return `${value.slice(0, 8)}…${value.slice(-8)}`
 }
+
+const permissionModes = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']
 
 function useSystemTheme(): ThemeMode {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readSystemTheme())

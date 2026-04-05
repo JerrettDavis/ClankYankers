@@ -5,7 +5,7 @@ namespace ClankYankers.Server.Infrastructure.Backplanes;
 
 public sealed class LocalBackplane(IPtyProcessFactory ptyProcessFactory) : IBackplane
 {
-    public string Id => "local";
+    public string Kind => "local";
 
     public Task<IInteractiveSession> StartAsync(
         string sessionId,

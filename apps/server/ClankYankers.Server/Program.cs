@@ -38,6 +38,7 @@ builder.Services.AddSingleton<IBackplane, LocalBackplane>();
 builder.Services.AddSingleton<IBackplane, DockerBackplane>();
 builder.Services.AddSingleton<IAgentConnector, ShellConnector>();
 builder.Services.AddSingleton<IAgentConnector, OllamaConnector>();
+builder.Services.AddSingleton<IAgentConnector, ClaudeConnector>();
 builder.Services.AddSingleton<BackplaneRegistry>();
 builder.Services.AddSingleton<ConnectorRegistry>();
 builder.Services.AddSingleton<SessionRegistry>();

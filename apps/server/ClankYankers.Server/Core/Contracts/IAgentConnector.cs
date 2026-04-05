@@ -4,7 +4,7 @@ namespace ClankYankers.Server.Core.Contracts;
 
 public interface IAgentConnector
 {
-    string Id { get; }
+    string Kind { get; }
 
     LaunchSpec BuildLaunchSpec(
         string sessionId,

@@ -72,10 +72,141 @@ public sealed class SessionOrchestratorTests
         Assert.Contains("does not belong to backplane", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private sealed class FakeConfigStore : IConfigStore
+    [Fact]
+    public async Task CreateAsync_resolves_connectors_by_kind_instead_of_configured_id()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Connectors =
+            [
+                new ConnectorDefinition
+                {
+                    Id = "claude-team",
+                    DisplayName = "Claude Team",
+                    Kind = "claude",
+                    LaunchCommand = "claude",
+                    DefaultPermissionMode = "acceptEdits"
+                }
+            ]
+        };
+        var backplane = new FakeBackplane("local");
+        var orchestrator = new SessionOrchestrator(
+            new FakeConfigStore(config),
+            new BackplaneRegistry([backplane]),
+            new ConnectorRegistry([new ClaudeConnector()]),
+            new SessionRegistry(),
+            new InMemoryEventBus(),
+            LoggerFactory.Create(_ => { }));
+
+        var session = await orchestrator.CreateAsync(
+            new CreateSessionRequest
+            {
+                BackplaneId = "local",
+                HostId = "local-host",
+                ConnectorId = "claude-team",
+                Model = "opus-4.6",
+                Cols = 120,
+                Rows = 34
+            },
+            CancellationToken.None);
+
+        Assert.Equal("claude-team", session.ConnectorId);
+        Assert.NotNull(backplane.LastLaunchSpec);
+        Assert.Equal("claude", backplane.LastLaunchSpec!.FileName);
+        Assert.Contains("--model", backplane.LastLaunchSpec.Arguments);
+        Assert.Contains("opus-4.6", backplane.LastLaunchSpec.Arguments);
+    }
+
+    [Fact]
+    public async Task CreateAsync_resolves_backplanes_by_kind_instead_of_configured_id()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "local-alt",
+                    DisplayName = "Local Alt",
+                    Kind = "local"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "local-host",
+                    BackplaneId = "local-alt",
+                    DisplayName = "Local",
+                    ShellExecutable = "pwsh.exe"
+                }
+            ]
+        };
+        var backplane = new FakeBackplane("local");
+        var orchestrator = new SessionOrchestrator(
+            new FakeConfigStore(config),
+            new BackplaneRegistry([backplane]),
+            new ConnectorRegistry([new ShellConnector()]),
+            new SessionRegistry(),
+            new InMemoryEventBus(),
+            LoggerFactory.Create(_ => { }));
+
+        await orchestrator.CreateAsync(
+            new CreateSessionRequest
+            {
+                BackplaneId = "local-alt",
+                HostId = "local-host",
+                ConnectorId = "shell",
+                Cols = 120,
+                Rows = 34
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(backplane.LastLaunchSpec);
+        Assert.Equal("pwsh.exe", backplane.LastLaunchSpec!.FileName);
+    }
+
+    [Fact]
+    public async Task CreateAsync_rejects_disabled_connectors()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Connectors =
+            [
+                new ConnectorDefinition
+                {
+                    Id = "shell",
+                    DisplayName = "Shell",
+                    Kind = "shell",
+                    Enabled = false
+                }
+            ]
+        };
+        var orchestrator = new SessionOrchestrator(
+            new FakeConfigStore(config),
+            new BackplaneRegistry([new FakeBackplane("local")]),
+            new ConnectorRegistry([new ShellConnector()]),
+            new SessionRegistry(),
+            new InMemoryEventBus(),
+            LoggerFactory.Create(_ => { }));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            orchestrator.CreateAsync(
+                new CreateSessionRequest
+                {
+                    BackplaneId = "local",
+                    HostId = "local-host",
+                    ConnectorId = "shell",
+                    Cols = 120,
+                    Rows = 34
+                },
+                CancellationToken.None));
+    }
+
+    private sealed class FakeConfigStore(AppConfig? config = null) : IConfigStore
     {
         public Task<AppConfig> LoadAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(AppConfig.CreateDefault());
+            Task.FromResult(config ?? AppConfig.CreateDefault());
 
         public Task SaveAsync(AppConfig config, CancellationToken cancellationToken) =>
             Task.CompletedTask;
@@ -83,14 +214,19 @@ public sealed class SessionOrchestratorTests
 
     private sealed class FakeBackplane(string id) : IBackplane
     {
-        public string Id => id;
+        public LaunchSpec? LastLaunchSpec { get; private set; }
+
+        public string Kind => id;
 
         public Task<IInteractiveSession> StartAsync(
             string sessionId,
             HostConfig host,
             LaunchSpec launchSpec,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IInteractiveSession>(new FakeInteractiveSession(sessionId));
+            CancellationToken cancellationToken)
+        {
+            LastLaunchSpec = launchSpec;
+            return Task.FromResult<IInteractiveSession>(new FakeInteractiveSession(sessionId));
+        }
     }
 
     private sealed class FakeInteractiveSession(string sessionId) : IInteractiveSession

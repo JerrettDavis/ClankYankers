@@ -28,8 +28,24 @@ public static class SessionEndpoints
             SessionOrchestrator orchestrator,
             CancellationToken cancellationToken) =>
         {
-            var session = await orchestrator.CreateAsync(request, cancellationToken);
-            return Results.Created($"/api/sessions/{session.Id}", session);
+            var errors = SessionRequestValidator.Validate(request);
+            if (errors.Count > 0)
+            {
+                return Results.ValidationProblem(errors);
+            }
+
+            try
+            {
+                var session = await orchestrator.CreateAsync(request, cancellationToken);
+                return Results.Created($"/api/sessions/{session.Id}", session);
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["session"] = [exception.Message]
+                });
+            }
         });
 
         group.MapPost("/sessions/{sessionId}/stop", async (

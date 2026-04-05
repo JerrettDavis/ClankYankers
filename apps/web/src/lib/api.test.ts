@@ -54,7 +54,20 @@ describe('api client', () => {
           enabled: true,
         },
       ],
-      connectors: [{ id: 'shell', displayName: 'Shell', kind: 'shell', defaultModel: null, enabled: true }],
+      connectors: [
+        {
+          id: 'shell',
+          displayName: 'Shell',
+          kind: 'shell',
+          launchCommand: null,
+          launchArguments: [],
+          defaultModel: null,
+          defaultPermissionMode: null,
+          allowedTools: [],
+          skipPermissions: false,
+          enabled: true,
+        },
+      ],
     }
 
     await expect(saveConfig(invalidConfig)).rejects.toMatchObject({

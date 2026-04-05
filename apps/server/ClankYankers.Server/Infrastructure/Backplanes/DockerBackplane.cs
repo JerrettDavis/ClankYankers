@@ -10,7 +10,7 @@ namespace ClankYankers.Server.Infrastructure.Backplanes;
 
 public sealed class DockerBackplane(ILogger<DockerBackplane> logger) : IBackplane
 {
-    public string Id => "docker";
+    public string Kind => "docker";
 
     public async Task<IInteractiveSession> StartAsync(
         string sessionId,

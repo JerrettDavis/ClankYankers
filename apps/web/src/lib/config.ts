@@ -11,6 +11,7 @@ export interface LaunchDraft {
   backplaneId: string
   hostId: string
   connectorId: string
+  model: string | null
   cols: number
   rows: number
 }
@@ -41,11 +42,15 @@ export function getEnabledBackplanes(config: AppConfig): BackplaneDefinition[] {
 }
 
 export function getEnabledHosts(config: AppConfig, backplaneId: string): HostConfig[] {
-  return config.hosts.filter((host) => host.enabled && host.backplaneId === backplaneId)
+  return config.hosts.filter((host) => host.enabled && sameId(host.backplaneId, backplaneId))
 }
 
 export function getEnabledConnectors(config: AppConfig): ConnectorDefinition[] {
   return config.connectors.filter((connector) => connector.enabled)
+}
+
+export function getConnector(config: AppConfig, connectorId: string): ConnectorDefinition | undefined {
+  return config.connectors.find((connector) => sameId(connector.id, connectorId))
 }
 
 export function coerceLaunchDraft(config: AppConfig, current?: Partial<LaunchDraft>): LaunchDraft {
@@ -63,11 +68,13 @@ export function coerceLaunchDraft(config: AppConfig, current?: Partial<LaunchDra
     getEnabledConnectors(config).map((item) => item.id),
     current?.connectorId,
   )
+  const connectorDefinition = getConnector(config, connector)
 
   return {
     backplaneId: backplane,
     hostId: host,
     connectorId: connector,
+    model: pickText(current?.model, connectorDefinition?.defaultModel),
     cols: clampDimension(current?.cols, 120),
     rows: clampDimension(current?.rows, 34),
   }
@@ -89,7 +96,7 @@ export function createBackplaneDefinition(): BackplaneDefinition {
   return {
     id,
     displayName: `New backplane ${id.slice(-4)}`,
-    kind: 'custom',
+    kind: 'local',
     enabled: true,
   }
 }
@@ -115,7 +122,12 @@ export function createConnectorDefinition(): ConnectorDefinition {
     id,
     displayName: `New connector ${id.slice(-4)}`,
     kind: 'shell',
+    launchCommand: null,
+    launchArguments: [],
     defaultModel: null,
+    defaultPermissionMode: null,
+    allowedTools: [],
+    skipPermissions: false,
     enabled: true,
   }
 }
@@ -129,11 +141,28 @@ function clampDimension(value: number | undefined, fallback: number): number {
 }
 
 function pickValue(values: string[], current: string | undefined): string {
-  if (current && values.includes(current)) {
-    return current
+  if (current) {
+    const matched = values.find((value) => sameId(value, current))
+    if (matched) {
+      return matched
+    }
   }
 
   return values[0] ?? ''
+}
+
+function pickText(current: string | null | undefined, fallback: string | null | undefined): string | null {
+  if (typeof current === 'string') {
+    const trimmed = current.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (typeof fallback === 'string') {
+    const trimmed = fallback.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  return null
 }
 
 function uniqueId(prefix: string): string {
@@ -143,4 +172,8 @@ function uniqueId(prefix: string): string {
       : Math.random().toString(36).slice(2, 10)
 
   return `${prefix}-${suffix}`
+}
+
+function sameId(left: string, right: string): boolean {
+  return left.localeCompare(right, undefined, { sensitivity: 'accent' }) === 0
 }

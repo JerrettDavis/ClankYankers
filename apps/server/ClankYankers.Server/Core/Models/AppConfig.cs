@@ -65,7 +65,17 @@ public sealed record AppConfig
                     Id = "ollama",
                     DisplayName = "Ollama qwen3.5:9b",
                     Kind = "ollama",
+                    LaunchCommand = "ollama",
+                    LaunchArguments = [],
                     DefaultModel = "qwen3.5:9b"
+                },
+                new ConnectorDefinition
+                {
+                    Id = "claude",
+                    DisplayName = "Claude Code",
+                    Kind = "claude",
+                    LaunchCommand = "claude",
+                    DefaultPermissionMode = "default"
                 }
             ]
         };
@@ -111,7 +121,17 @@ public sealed record ConnectorDefinition
 
     public required string Kind { get; init; }
 
+    public string? LaunchCommand { get; init; }
+
+    public IReadOnlyList<string> LaunchArguments { get; init; } = [];
+
     public string? DefaultModel { get; init; }
+
+    public string? DefaultPermissionMode { get; init; }
+
+    public IReadOnlyList<string> AllowedTools { get; init; } = [];
+
+    public bool SkipPermissions { get; init; }
 
     public bool Enabled { get; init; } = true;
 }

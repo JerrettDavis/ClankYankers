@@ -27,14 +27,14 @@ public sealed class SessionOrchestrator(
         var backplaneDefinition = ResolveBackplaneDefinition(config, request, connectorDefinition);
         var host = ResolveHost(config, request, backplaneDefinition);
 
-        if (!connectorRegistry.TryGet(connectorDefinition.Id, out var connector))
+        if (!connectorRegistry.TryGet(connectorDefinition.Kind, out var connector))
         {
-            throw new InvalidOperationException($"Connector '{connectorDefinition.Id}' is not registered.");
+            throw new InvalidOperationException($"Connector kind '{connectorDefinition.Kind}' is not registered.");
         }
 
-        if (!backplaneRegistry.TryGet(backplaneDefinition.Id, out var backplane))
+        if (!backplaneRegistry.TryGet(backplaneDefinition.Kind, out var backplane))
         {
-            throw new InvalidOperationException($"Backplane '{backplaneDefinition.Id}' is not registered.");
+            throw new InvalidOperationException($"Backplane kind '{backplaneDefinition.Kind}' is not registered.");
         }
 
         var sessionId = Guid.NewGuid().ToString("n");
@@ -133,7 +133,9 @@ public sealed class SessionOrchestrator(
     private static ConnectorDefinition ResolveConnectorDefinition(AppConfig config, CreateSessionRequest request)
     {
         var connectorId = request.ConnectorId ?? "shell";
-        return config.Connectors.FirstOrDefault(connector => connector.Id.Equals(connectorId, StringComparison.OrdinalIgnoreCase))
+        return config.Connectors.FirstOrDefault(connector =>
+                connector.Enabled &&
+                connector.Id.Equals(connectorId, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Unknown connector '{connectorId}'.");
     }
 
@@ -143,7 +145,9 @@ public sealed class SessionOrchestrator(
         ConnectorDefinition connector)
     {
         var requestedBackplane = request.BackplaneId ?? "local";
-        return config.Backplanes.FirstOrDefault(backplane => backplane.Id.Equals(requestedBackplane, StringComparison.OrdinalIgnoreCase))
+        return config.Backplanes.FirstOrDefault(backplane =>
+                backplane.Enabled &&
+                backplane.Id.Equals(requestedBackplane, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Unknown backplane '{requestedBackplane}' for connector '{connector.Id}'.");
     }
 
@@ -154,6 +158,11 @@ public sealed class SessionOrchestrator(
             var host = config.Hosts.FirstOrDefault(candidate => candidate.Id.Equals(request.HostId, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException($"Unknown host '{request.HostId}'.");
 
+            if (!host.Enabled)
+            {
+                throw new InvalidOperationException($"Host '{host.Id}' is disabled.");
+            }
+
             if (!host.BackplaneId.Equals(backplane.Id, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException($"Host '{host.Id}' does not belong to backplane '{backplane.Id}'.");
@@ -162,7 +171,9 @@ public sealed class SessionOrchestrator(
             return host;
         }
 
-        return config.Hosts.FirstOrDefault(host => host.BackplaneId.Equals(backplane.Id, StringComparison.OrdinalIgnoreCase))
+        return config.Hosts.FirstOrDefault(host =>
+                host.Enabled &&
+                host.BackplaneId.Equals(backplane.Id, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"No host configured for backplane '{backplane.Id}'.");
     }
 }

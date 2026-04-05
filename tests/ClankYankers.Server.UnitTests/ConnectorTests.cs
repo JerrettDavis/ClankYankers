@@ -55,11 +55,118 @@ public sealed class ConnectorTests
                 Id = "ollama",
                 DisplayName = "Ollama",
                 Kind = "ollama",
+                LaunchCommand = "ollama",
+                LaunchArguments = [],
                 DefaultModel = "qwen3.5:9b"
             });
 
         Assert.Equal("ollama", launchSpec.FileName);
         Assert.Equal(["run", "qwen3.5:9b"], launchSpec.Arguments);
         Assert.Equal("ollama run qwen3.5:9b", launchSpec.DisplayCommand);
+    }
+
+    [Fact]
+    public void OllamaConnector_preserves_required_run_subcommand_when_extra_arguments_are_configured()
+    {
+        var connector = new OllamaConnector();
+        var launchSpec = connector.BuildLaunchSpec(
+            "session-ollama",
+            new CreateSessionRequest { Cols = 100, Rows = 28 },
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe"
+            },
+            new ConnectorDefinition
+            {
+                Id = "ollama",
+                DisplayName = "Ollama",
+                Kind = "ollama",
+                LaunchCommand = "ollama",
+                LaunchArguments = ["--verbose"],
+                DefaultModel = "qwen3.5:9b"
+            });
+
+        Assert.Equal(["run", "--verbose", "qwen3.5:9b"], launchSpec.Arguments);
+        Assert.Equal("ollama run --verbose qwen3.5:9b", launchSpec.DisplayCommand);
+    }
+
+    [Fact]
+    public void ClaudeConnector_builds_launch_spec_from_connector_policy_and_model_override()
+    {
+        var connector = new ClaudeConnector();
+
+        var launchSpec = connector.BuildLaunchSpec(
+            "session-claude",
+            new CreateSessionRequest
+            {
+                Cols = 120,
+                Rows = 40,
+                Model = "sonnet-4.6"
+            },
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe",
+                WorkingDirectory = "C:\\git\\ClankYankers"
+            },
+            new ConnectorDefinition
+            {
+                Id = "claude",
+                DisplayName = "Claude Code",
+                Kind = "claude",
+                LaunchCommand = "claude",
+                LaunchArguments = ["--verbose"],
+                DefaultPermissionMode = "plan",
+                AllowedTools = ["Read", "Bash(ls *)"],
+                SkipPermissions = true
+            });
+
+        Assert.Equal("claude", launchSpec.FileName);
+        Assert.Equal(
+            ["--verbose", "--model", "sonnet-4.6", "--dangerously-skip-permissions", "--allowedTools", "Read,Bash(ls *)"],
+            launchSpec.Arguments);
+        Assert.Equal(
+            "claude --verbose --model sonnet-4.6 --dangerously-skip-permissions --allowedTools Read,Bash(ls *)",
+            launchSpec.DisplayCommand);
+        Assert.Equal("C:\\git\\ClankYankers", launchSpec.WorkingDirectory);
+    }
+
+    [Fact]
+    public void ClaudeConnector_strips_reserved_arguments_from_base_configuration()
+    {
+        var connector = new ClaudeConnector();
+
+        var launchSpec = connector.BuildLaunchSpec(
+            "session-claude",
+            new CreateSessionRequest
+            {
+                Cols = 120,
+                Rows = 40,
+                Model = "sonnet-4.6"
+            },
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe"
+            },
+            new ConnectorDefinition
+            {
+                Id = "claude",
+                DisplayName = "Claude Code",
+                Kind = "claude",
+                LaunchCommand = "claude",
+                LaunchArguments = ["--verbose", "--model", "haiku", "--dangerously-skip-permissions", "--permission-mode", "acceptEdits", "--allowedTools", "Read"],
+                DefaultPermissionMode = "plan"
+            });
+
+        Assert.Equal(["--verbose", "--model", "sonnet-4.6", "--permission-mode", "plan"], launchSpec.Arguments);
+        Assert.Equal("claude --verbose --model sonnet-4.6 --permission-mode plan", launchSpec.DisplayCommand);
     }
 }

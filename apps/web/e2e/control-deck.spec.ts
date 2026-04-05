@@ -102,6 +102,40 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
   await expect(page.getByTestId('discard-config')).toBeEnabled()
   await page.getByTestId('discard-config').click()
   await expect(reloadedLocalBackplaneCard.getByLabel('Name')).toHaveValue('Local E2E')
+
+  const claudeConnectorCard = page.getByTestId('connector-card-claude')
+  await claudeConnectorCard.getByLabel('Base arguments').fill('--verbose')
+  await claudeConnectorCard.getByLabel('Permission mode').fill('plan')
+  await claudeConnectorCard.getByLabel('Allowed tools').fill('Read, Edit')
+
+  await page.getByTestId('save-config').click()
+  await expect(page.getByText('Configuration saved.')).toBeVisible()
+
+  await page.reload()
+  await waitForDeck(page)
+  await page.getByTestId('launch-connector').selectOption('claude')
+  await expect(page.getByTestId('launch-connector-command')).toContainText('claude --verbose')
+
+  await openConfigPanel(page)
+  const reloadedClaudeConnectorCard = page.getByTestId('connector-card-claude')
+  await expect(reloadedClaudeConnectorCard.getByLabel('Permission mode')).toHaveValue('plan')
+  await expect(reloadedClaudeConnectorCard.getByLabel('Allowed tools')).toHaveValue('Read, Edit')
+})
+
+test('shows connector-specific launch overrides for client CLIs', async ({ page }) => {
+  await openDeck(page)
+
+  await page.getByTestId('launch-connector').selectOption('claude')
+  await expect(page.getByTestId('launch-overrides')).toBeVisible()
+  await expect(page.getByTestId('launch-model')).toBeVisible()
+
+  await page.getByTestId('launch-connector').selectOption('ollama')
+  await expect(page.getByTestId('launch-overrides')).toBeVisible()
+  await expect(page.getByTestId('launch-model')).toBeVisible()
+
+  await page.getByTestId('launch-connector').selectOption('shell')
+  await expect(page.getByTestId('launch-overrides')).toHaveCount(0)
+  await expect(page.getByText(/uses the selected host shell/i)).toBeVisible()
 })
 
 test('runs local shell flows end to end and records audit events', async ({ page, request }) => {
@@ -205,7 +239,7 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
     await expect(page.getByTestId(`workspace-tab-session:${sessionA}`)).toHaveCount(0)
     await expect(page.getByTestId(`session-card-${sessionA}`)).toBeVisible()
 
-    await page.getByTestId(`session-card-${sessionA}`).click()
+    await reopenSessionFromManifest(page, sessionA)
     await expect(page.getByTestId(`workspace-tab-session:${sessionA}`)).toBeVisible()
     await expect(page.getByTestId(`stop-session-${sessionA}`)).toBeVisible()
 
@@ -364,6 +398,15 @@ async function waitForNewSessionId(request: APIRequestContext, beforeIds: Set<st
   }).toBeTruthy()
 
   return sessionId!
+}
+
+async function reopenSessionFromManifest(page: Page, sessionId: string) {
+  const sessionCard = page.getByTestId(`session-card-${sessionId}`)
+  await sessionCard.evaluate((element) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await sessionCard.focus()
+  await page.keyboard.press('Enter')
 }
 
 

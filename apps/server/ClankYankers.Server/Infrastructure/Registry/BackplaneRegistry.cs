@@ -5,9 +5,9 @@ namespace ClankYankers.Server.Infrastructure.Registry;
 public sealed class BackplaneRegistry(IEnumerable<IBackplane> backplanes)
 {
     private readonly IReadOnlyDictionary<string, IBackplane> _backplanes =
-        backplanes.ToDictionary(backplane => backplane.Id, StringComparer.OrdinalIgnoreCase);
+        backplanes.ToDictionary(backplane => backplane.Kind, StringComparer.OrdinalIgnoreCase);
 
-    public bool TryGet(string id, out IBackplane backplane) => _backplanes.TryGetValue(id, out backplane!);
+    public bool TryGet(string kind, out IBackplane backplane) => _backplanes.TryGetValue(kind, out backplane!);
 
-    public IReadOnlyCollection<string> Ids => _backplanes.Keys.ToArray();
+    public IReadOnlyCollection<string> Kinds => _backplanes.Keys.ToArray();
 }

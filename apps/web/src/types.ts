@@ -21,7 +21,12 @@ export interface ConnectorDefinition {
   id: string
   displayName: string
   kind: string
+  launchCommand: string | null
+  launchArguments: string[]
   defaultModel: string | null
+  defaultPermissionMode: string | null
+  allowedTools: string[]
+  skipPermissions: boolean
   enabled: boolean
 }
 
@@ -57,6 +62,7 @@ export interface CreateSessionRequest {
   backplaneId: string
   hostId: string
   connectorId: string
+  model: string | null
   cols: number
   rows: number
 }

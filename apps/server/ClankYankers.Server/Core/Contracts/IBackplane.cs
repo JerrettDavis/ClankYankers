@@ -4,7 +4,7 @@ namespace ClankYankers.Server.Core.Contracts;
 
 public interface IBackplane
 {
-    string Id { get; }
+    string Kind { get; }
 
     Task<IInteractiveSession> StartAsync(
         string sessionId,

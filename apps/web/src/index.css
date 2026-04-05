@@ -328,13 +328,13 @@ code {
 
 .rail {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.5rem;
   min-width: 0;
   min-height: 0;
   block-size: 100%;
   align-content: start;
-  overflow: hidden;
+  overflow: auto;
   padding-right: 0.2rem;
 }
 
@@ -398,6 +398,23 @@ code {
   font-weight: 600;
 }
 
+.field p {
+  margin: 0;
+  min-height: 2.75rem;
+  padding: 0.78rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in oklab, var(--line-soft) 88%, white);
+  background: color-mix(in oklab, var(--surface-soft) 86%, transparent);
+  color: var(--ink-1);
+  display: flex;
+  align-items: center;
+}
+
+.field--hint p {
+  min-height: 2.35rem;
+  padding-block: 0.62rem;
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -428,6 +445,25 @@ code {
   display: grid;
   gap: var(--space-md);
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.launch-overrides {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field--hint,
+.field-note {
+  grid-column: 1 / -1;
+}
+
+.field-note {
+  margin: 0;
+  color: var(--ink-1);
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .button {
@@ -486,6 +522,7 @@ code {
 }
 
 .panel--manifest {
+  grid-row: 2;
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -578,6 +615,7 @@ code {
 }
 
 .panel--settings {
+  grid-row: 3;
   display: block;
   min-height: 0;
   padding: 0.85rem;
@@ -668,6 +706,9 @@ code {
 }
 
 .panel--launch .launch-form > .field:nth-of-type(3),
+.panel--launch .launch-form > .field--hint,
+.panel--launch .launch-form > .field-note,
+.panel--launch .launch-form > .launch-overrides,
 .panel--launch .launch-form > .dimension-grid,
 .panel--launch .launch-form > .launch-button {
   grid-column: 1 / -1;
@@ -1246,6 +1287,7 @@ code {
   }
 
   .config-card__grid,
+  .launch-overrides,
   .dimension-grid,
   .panel--launch .launch-form {
     grid-template-columns: 1fr;
@@ -1259,7 +1301,7 @@ code {
   }
 
   .rail {
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     block-size: 100%;
     overflow: auto;
     padding-right: 0.1rem;

@@ -5,7 +5,7 @@ namespace ClankYankers.Server.Infrastructure.Connectors;
 
 public sealed class ShellConnector : IAgentConnector
 {
-    public string Id => "shell";
+    public string Kind => "shell";
 
     public LaunchSpec BuildLaunchSpec(
         string sessionId,
