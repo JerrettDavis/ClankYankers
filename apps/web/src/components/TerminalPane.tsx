@@ -5,7 +5,8 @@ import { Terminal } from '@xterm/xterm'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { TerminalClientMessage, TerminalServerMessage } from '../types'
-import { createTerminalPageScrollLock } from './terminalPageScrollLock'
+import { createTerminalPageInteractionRelease } from './terminalFocusRelease'
+import { createTerminalOutputScrollGuard } from './terminalOutputScrollGuard'
 
 type ConnectionState = 'connecting' | 'live' | 'closed' | 'error'
 type ThemeMode = 'light' | 'dark'
@@ -67,7 +68,8 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(host)
-    const releasePageScrollLock = createTerminalPageScrollLock(host)
+    const releaseTerminalPageInteraction = createTerminalPageInteractionRelease(host, () => terminal.blur())
+    const outputScrollGuard = createTerminalOutputScrollGuard(host)
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws/session/${sessionId}`)
@@ -149,13 +151,19 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       const message = JSON.parse(event.data) as TerminalServerMessage
       onSessionMessageRef.current?.(message)
 
-      if (message.type === 'output' && message.data) {
-        terminal.write(message.data)
+      if (message.type === 'output' && typeof message.data === 'string') {
+        const output = message.data
+        outputScrollGuard.preservePageScroll((restorePageScroll) => {
+          terminal.write(output, restorePageScroll)
+        })
         return
       }
 
-      if (message.type === 'error' && message.message) {
-        terminal.writeln(`\r\n[session error] ${message.message}`)
+      if (message.type === 'error' && typeof message.message === 'string') {
+        const errorMessage = message.message
+        outputScrollGuard.preservePageScroll((restorePageScroll) => {
+          terminal.writeln(`\r\n[session error] ${errorMessage}`, restorePageScroll)
+        })
       }
     }
 
@@ -182,7 +190,8 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
 
     return () => {
       isDisposed = true
-      releasePageScrollLock()
+      releaseTerminalPageInteraction()
+      outputScrollGuard.dispose()
       resizeDisposable.dispose()
       dataDisposable.dispose()
       resizeObserver.disconnect()
