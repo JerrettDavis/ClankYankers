@@ -39,9 +39,11 @@ import type {
 } from './types'
 
 type ThemeMode = 'light' | 'dark'
+const compactWorkspaceQuery = '(max-width: 720px), (max-height: 760px)'
 
 function App() {
   const themeMode = useSystemTheme()
+  const compactWorkspace = useCompactWorkspace()
   const [savedConfig, setSavedConfig] = useState<AppConfig | null>(null)
   const [configDraft, setConfigDraft] = useState<AppConfig | null>(null)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
@@ -86,7 +88,7 @@ function App() {
       setWorkspace(createInitialWorkspace(state.sessions))
       setLaunchDraft(coerceLaunchDraft(state.config))
       setConfigDirty(false)
-      setStatusMessage('Control deck synchronized with the local runtime.')
+      setStatusMessage('Control deck synchronized.')
     } catch (error) {
       setErrorMessage(asMessage(error))
     } finally {
@@ -109,6 +111,14 @@ function App() {
   useEffect(() => {
     setWorkspace((current) => syncWorkspaceState(current, sessions))
   }, [sessions])
+
+  useEffect(() => {
+    if (!compactWorkspace) {
+      return
+    }
+
+    setWorkspace((current) => (current.layout === 'single' ? current : setWorkspaceLayout(current, 'single')))
+  }, [compactWorkspace])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -147,6 +157,7 @@ function App() {
     ],
     [sessions],
   )
+  const canSplitWorkspace = !compactWorkspace && (sessions.length >= 2 || workspace.secondaryTabId !== null)
 
   const updateLaunchDraft = <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) => {
     if (!savedConfig) {
@@ -184,7 +195,7 @@ function App() {
       const createdSession = await createSession(launchDraft)
       setSessions((current) => [createdSession, ...current])
       setWorkspace((current) => openSessionTab(current, createdSession))
-      setStatusMessage(`Session ${createdSession.id} is live.`)
+      setStatusMessage(`Session ${formatWorkspaceLabel(createdSession.id)} is live.`)
     } catch (error) {
       setErrorMessage(asMessage(error))
     } finally {
@@ -224,7 +235,7 @@ function App() {
       setConfigDraft(persistedConfig)
       setConfigDirty(false)
       setLaunchDraft((current) => coerceLaunchDraft(persistedConfig, current))
-      setStatusMessage('Configuration persisted to local storage.')
+      setStatusMessage('Configuration saved.')
     } catch (error) {
       setErrorMessage(asMessage(error))
     } finally {
@@ -294,9 +305,12 @@ function App() {
   )
 
   const handleOpenSession = (session: SessionSummary, target: 'primary' | 'secondary' = 'primary') => {
-    setWorkspace((current) => openSessionTab(current, session, { target }))
+    const resolvedTarget = compactWorkspace ? 'primary' : target
+    setWorkspace((current) => openSessionTab(current, session, { target: resolvedTarget }))
     setStatusMessage(
-      target === 'secondary' ? `Comparing ${session.id} in a split pane.` : `Focused ${session.id} in the workspace.`,
+      resolvedTarget === 'secondary'
+        ? `Comparing ${session.id} in a split pane.`
+        : `Focused ${session.id} in the workspace.`,
     )
   }
 
@@ -390,7 +404,7 @@ function App() {
             <div className="masthead__status">
               <div className="status-chip">
                 <span className="status-chip__label">Deck status</span>
-                <strong>{statusMessage}</strong>
+                <strong title={statusMessage}>{statusMessage}</strong>
               </div>
               <div className="status-chip">
                 <span className="status-chip__label">Live sessions</span>
@@ -696,8 +710,9 @@ function App() {
                   className="button button--ghost"
                   data-testid="split-vertical"
                   onClick={() => handleSetWorkspaceLayout('split-vertical')}
-                  disabled={sessions.length < 2 && workspace.secondaryTabId === null}
+                  disabled={!canSplitWorkspace}
                   type="button"
+                  title={compactWorkspace ? 'Compare panes are available on larger viewports.' : undefined}
                 >
                   Split vertical
                 </button>
@@ -705,8 +720,9 @@ function App() {
                   className="button button--ghost"
                   data-testid="split-horizontal"
                   onClick={() => handleSetWorkspaceLayout('split-horizontal')}
-                  disabled={sessions.length < 2 && workspace.secondaryTabId === null}
+                  disabled={!canSplitWorkspace}
                   type="button"
+                  title={compactWorkspace ? 'Compare panes are available on larger viewports.' : undefined}
                 >
                   Split horizontal
                 </button>
@@ -773,6 +789,7 @@ function App() {
                   onSelectTab={handleSelectPaneTab}
                   onSessionMessage={handleSessionMessage}
                   onStopSession={handleStopSession}
+                  allowCompare={!compactWorkspace}
                 />
 
                 {workspace.layout !== 'single' && secondaryTab ? (
@@ -789,6 +806,7 @@ function App() {
                     onSelectTab={handleSelectPaneTab}
                     onSessionMessage={handleSessionMessage}
                     onStopSession={handleStopSession}
+                    allowCompare={!compactWorkspace}
                   />
                 ) : null}
               </div>
@@ -801,6 +819,7 @@ function App() {
 }
 
 interface WorkspacePaneViewProps {
+  allowCompare: boolean
   isStoppingSession: boolean
   label: string
   onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
@@ -816,6 +835,7 @@ interface WorkspacePaneViewProps {
 }
 
 function WorkspacePaneView({
+  allowCompare,
   isStoppingSession,
   label,
   onOpenSession,
@@ -871,24 +891,12 @@ function WorkspacePaneView({
 
       {isSessionTab(tab) && session ? (
         <div className="workspace-pane__body">
-          <dl className="session-meta">
-            <div>
-              <dt>Backplane</dt>
-              <dd>{session.backplaneId}</dd>
-            </div>
-            <div>
-              <dt>Host</dt>
-              <dd>{session.hostId}</dd>
-            </div>
-            <div>
-              <dt>Connector</dt>
-              <dd>{session.connectorId}</dd>
-            </div>
-            <div>
-              <dt>Command</dt>
-              <dd>{session.displayCommand}</dd>
-            </div>
-          </dl>
+          <div className="workspace-pane__summary">
+            <span>{session.backplaneId}</span>
+            <span>{session.hostId}</span>
+            <span>{session.connectorId}</span>
+            <code title={session.displayCommand}>{session.displayCommand}</code>
+          </div>
 
           <div className="stage__dock workspace-pane__dock">
             <TerminalPane
@@ -900,19 +908,20 @@ function WorkspacePaneView({
           </div>
         </div>
       ) : (
-        <OrchestrationBoard onOpenSession={onOpenSession} sessions={sessions} target={target} />
+        <OrchestrationBoard allowCompare={allowCompare} onOpenSession={onOpenSession} sessions={sessions} target={target} />
       )}
     </section>
   )
 }
 
 interface OrchestrationBoardProps {
+  allowCompare: boolean
   onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
   sessions: SessionSummary[]
   target: 'primary' | 'secondary'
 }
 
-function OrchestrationBoard({ onOpenSession, sessions, target }: OrchestrationBoardProps) {
+function OrchestrationBoard({ allowCompare, onOpenSession, sessions, target }: OrchestrationBoardProps) {
   const runningCount = sessions.filter((session) => session.state === 'Running').length
   const attentionCount = sessions.filter((session) => session.state === 'Failed').length
 
@@ -957,6 +966,8 @@ function OrchestrationBoard({ onOpenSession, sessions, target }: OrchestrationBo
                   className="button button--ghost"
                   data-testid={`compare-session-${session.id}`}
                   onClick={() => onOpenSession(session, 'secondary')}
+                  disabled={!allowCompare}
+                  title={!allowCompare ? 'Compare mode is unavailable on compact viewports.' : undefined}
                   type="button"
                 >
                   Compare
@@ -1280,12 +1291,51 @@ function useSystemTheme(): ThemeMode {
   return themeMode
 }
 
+function useCompactWorkspace(): boolean {
+  const [isCompact, setIsCompact] = useState<boolean>(() => readCompactWorkspace())
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia(compactWorkspaceQuery)
+    const syncCompactMode = () => {
+      setIsCompact(mediaQuery.matches)
+    }
+
+    syncCompactMode()
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncCompactMode)
+      return () => {
+        mediaQuery.removeEventListener('change', syncCompactMode)
+      }
+    }
+
+    mediaQuery.addListener(syncCompactMode)
+    return () => {
+      mediaQuery.removeListener(syncCompactMode)
+    }
+  }, [])
+
+  return isCompact
+}
+
 function readSystemTheme(): ThemeMode {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return 'light'
   }
 
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function readCompactWorkspace(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false
+  }
+
+  return window.matchMedia(compactWorkspaceQuery).matches
 }
 
 export default App

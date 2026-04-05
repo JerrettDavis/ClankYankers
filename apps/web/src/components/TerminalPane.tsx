@@ -250,10 +250,9 @@ export function TerminalPane({ label, sessionId, onSessionMessage, themeMode }: 
       data-testid={`terminal-shell-${sessionId}`}
     >
       <div className="terminal-shell__bar">
-        <div className="terminal-shell__meta">
-          <span className="terminal-shell__label">Docked console</span>
-          <strong title={sessionId}>{label ?? sessionId}</strong>
-        </div>
+        <strong className="terminal-shell__title" title={sessionId}>
+          {label ?? sessionId}
+        </strong>
         <div className={`terminal-connection terminal-connection--${connectionState}`}>
           {connectionLabel[connectionState]}
         </div>

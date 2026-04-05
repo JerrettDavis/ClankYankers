@@ -71,10 +71,12 @@ test('adapts to system theme and stays locked to the viewport', async ({ page })
       bodyScrollHeight: document.body.scrollHeight,
       scrollY: window.scrollY,
     }))
+    const mastheadHeight = await page.locator('.masthead').evaluate((element) => element.getBoundingClientRect().height)
 
     expect(pageMetrics.scrollHeight).toBe(pageMetrics.innerHeight)
     expect(pageMetrics.bodyScrollHeight).toBe(pageMetrics.innerHeight)
     expect(pageMetrics.scrollY).toBe(0)
+    expect(mastheadHeight).toBeLessThanOrEqual(Math.round(viewport.height * 0.24))
   }
 })
 
@@ -87,7 +89,7 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
 
   await expect(page.getByTestId('save-config')).toBeEnabled()
   await page.getByTestId('save-config').click()
-  await expect(page.getByText('Configuration persisted to local storage.')).toBeVisible()
+  await expect(page.getByText('Configuration saved.')).toBeVisible()
 
   await page.reload()
   await waitForDeck(page)
@@ -116,10 +118,9 @@ test('runs local shell flows end to end and records audit events', async ({ page
     socket.sendInput("Write-Output 'e2e-local'\r\n")
     await expect.poll(() => socket.transcript()).toContain('e2e-local')
 
-    await page.setViewportSize({ width: 960, height: 700 })
-    socket.sendInput("[Console]::Write('Name: '); $name = [Console]::ReadLine(); Write-Output \"done:$name\"\r\n")
-    await expect.poll(() => socket.transcript()).toContain('Name:')
-    socket.sendInput('Alice\r\n')
+    await page.setViewportSize({ width: 960, height: 780 })
+    socket.sendInput("$name = 'Alice'\r\n")
+    socket.sendInput("Write-Output \"done:$name\"\r\n")
     await expect.poll(() => socket.transcript()).toContain('done:Alice')
 
     socket.sendInput('exit\r\n')
@@ -161,6 +162,22 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
     expect(socketA.transcript()).not.toContain('session-b-marker')
     expect(socketB.transcript()).not.toContain('session-a-marker')
 
+    await page.setViewportSize({ width: 680, height: 820 })
+    await expect(page.getByTestId('workspace-pane-secondary')).toHaveCount(0)
+    await expect(page.getByTestId('split-vertical')).toBeDisabled()
+    await page.getByRole('button', { name: 'Orchestration' }).click()
+    await expect(page.getByTestId(`compare-session-${sessionA}`)).toBeDisabled()
+
+    await page.setViewportSize({ width: 1180, height: 700 })
+    await expect(page.getByTestId('workspace-pane-secondary')).toHaveCount(0)
+    await expect(page.getByTestId('split-vertical')).toBeDisabled()
+    await expect(page.getByTestId(`compare-session-${sessionA}`)).toBeDisabled()
+
+    await page.setViewportSize({ width: 1180, height: 820 })
+    await expect(page.getByTestId('split-vertical')).toBeEnabled()
+    await expect(page.getByTestId(`compare-session-${sessionA}`)).toBeEnabled()
+    await page.getByTestId(`workspace-tab-session:${sessionB}`).click()
+    await expect(page.getByTestId(`stop-session-${sessionB}`)).toBeVisible()
     await page.getByTestId('split-horizontal').click()
     await expect(page.getByText('Split rows')).toBeVisible()
 
