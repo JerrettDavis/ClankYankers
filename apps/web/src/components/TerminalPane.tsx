@@ -244,7 +244,11 @@ export function TerminalPane({ label, sessionId, onSessionMessage, themeMode }: 
   }, [sessionId])
 
   return (
-    <div className={`terminal-shell terminal-shell--${connectionState}`}>
+    <div
+      className={`terminal-shell terminal-shell--${connectionState}`}
+      data-session-id={sessionId}
+      data-testid={`terminal-shell-${sessionId}`}
+    >
       <div className="terminal-shell__bar">
         <div className="terminal-shell__meta">
           <span className="terminal-shell__label">Docked console</span>
@@ -254,9 +258,9 @@ export function TerminalPane({ label, sessionId, onSessionMessage, themeMode }: 
           {connectionLabel[connectionState]}
         </div>
       </div>
-      <div ref={viewportRef} className="terminal-scrollport">
-        <div ref={frameRef} className="terminal-frame">
-          <div ref={hostRef} className="terminal-canvas" />
+      <div ref={viewportRef} className="terminal-scrollport" data-testid={`terminal-scrollport-${sessionId}`}>
+        <div ref={frameRef} className="terminal-frame" data-testid={`terminal-frame-${sessionId}`}>
+          <div ref={hostRef} className="terminal-canvas" data-testid={`terminal-canvas-${sessionId}`} />
         </div>
       </div>
     </div>

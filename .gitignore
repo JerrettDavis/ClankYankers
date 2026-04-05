@@ -8,6 +8,8 @@ apps/web/dist/
 
 # Local editor and test artifacts
 .playwright-mcp/
+apps/web/playwright-report/
+apps/web/test-results/
 .vs/
 *.user
 *.rsuser

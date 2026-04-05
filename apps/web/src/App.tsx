@@ -402,11 +402,17 @@ function App() {
               </div>
             </div>
             <div className="header-actions">
-              <button className="button button--ghost" onClick={() => void refreshSessions()} type="button">
+              <button
+                className="button button--ghost"
+                data-testid="refresh-sessions"
+                onClick={() => void refreshSessions()}
+                type="button"
+              >
                 {isRefreshing ? 'Refreshing…' : 'Refresh sessions'}
               </button>
               <button
                 className="button button--ghost"
+                data-testid="discard-config"
                 onClick={handleResetDraft}
                 disabled={!configDirty}
                 type="button"
@@ -415,6 +421,7 @@ function App() {
               </button>
               <button
                 className="button button--solid"
+                data-testid="save-config"
                 onClick={handleSaveConfig}
                 disabled={isSavingConfig || !configDirty}
                 type="button"
@@ -441,10 +448,11 @@ function App() {
                 </div>
               </div>
 
-              <form className="launch-form" onSubmit={handleLaunchSession}>
+              <form className="launch-form" data-testid="launch-form" onSubmit={handleLaunchSession}>
                 <label className="field">
                   <span>Backplane</span>
                   <select
+                    data-testid="launch-backplane"
                     value={launchDraft.backplaneId}
                     onChange={(event) => updateLaunchDraft('backplaneId', event.target.value)}
                   >
@@ -459,6 +467,7 @@ function App() {
                 <label className="field">
                   <span>Host</span>
                   <select
+                    data-testid="launch-host"
                     value={launchDraft.hostId}
                     onChange={(event) => updateLaunchDraft('hostId', event.target.value)}
                   >
@@ -473,6 +482,7 @@ function App() {
                 <label className="field">
                   <span>Connector</span>
                   <select
+                    data-testid="launch-connector"
                     value={launchDraft.connectorId}
                     onChange={(event) => updateLaunchDraft('connectorId', event.target.value)}
                   >
@@ -488,6 +498,7 @@ function App() {
                   <label className="field">
                     <span>Columns</span>
                     <input
+                      data-testid="launch-cols"
                       type="number"
                       min={24}
                       max={240}
@@ -499,6 +510,7 @@ function App() {
                   <label className="field">
                     <span>Rows</span>
                     <input
+                      data-testid="launch-rows"
                       type="number"
                       min={24}
                       max={240}
@@ -508,14 +520,14 @@ function App() {
                   </label>
                 </div>
 
-                <button className="button button--solid launch-button" disabled={isCreatingSession}>
+                <button className="button button--solid launch-button" data-testid="launch-session" disabled={isCreatingSession}>
                   {isCreatingSession ? 'Launching…' : 'Launch session'}
                 </button>
               </form>
             </section>
 
-            <details className="panel panel--settings">
-              <summary>
+            <details className="panel panel--settings" data-testid="config-panel">
+              <summary data-testid="config-panel-toggle">
                 <div>
                   <p className="eyebrow">Configuration manifest</p>
                   <h2>Runtime config</h2>
@@ -634,6 +646,7 @@ function App() {
                   {sessions.map((session) => (
                     <button
                       key={session.id}
+                      data-testid={`session-card-${session.id}`}
                       className={`session-card${activeSession?.id === session.id ? ' is-active' : ''}`}
                       onClick={() => handleOpenSession(session)}
                       role="tab"
@@ -681,6 +694,7 @@ function App() {
                 </button>
                 <button
                   className="button button--ghost"
+                  data-testid="split-vertical"
                   onClick={() => handleSetWorkspaceLayout('split-vertical')}
                   disabled={sessions.length < 2 && workspace.secondaryTabId === null}
                   type="button"
@@ -689,6 +703,7 @@ function App() {
                 </button>
                 <button
                   className="button button--ghost"
+                  data-testid="split-horizontal"
                   onClick={() => handleSetWorkspaceLayout('split-horizontal')}
                   disabled={sessions.length < 2 && workspace.secondaryTabId === null}
                   type="button"
@@ -697,6 +712,7 @@ function App() {
                 </button>
                 <button
                   className="button button--ghost"
+                  data-testid="single-pane"
                   onClick={() => handleSetWorkspaceLayout('single')}
                   disabled={workspace.layout === 'single'}
                   type="button"
@@ -715,6 +731,7 @@ function App() {
                   >
                     <button
                       className="workspace-tab__trigger"
+                      data-testid={`workspace-tab-${tab.id}`}
                       onClick={() => setWorkspace((current) => focusWorkspaceTab(current, tab.id))}
                       role="tab"
                       aria-selected={tab.id === workspace.activeTabId}
@@ -730,6 +747,7 @@ function App() {
                     {tab.closable ? (
                       <button
                         className="workspace-tab__close"
+                        data-testid={`workspace-tab-close-${tab.id}`}
                         onClick={() => handleCloseWorkspaceTab(tab.id)}
                         aria-label={`Close ${tab.title}`}
                         type="button"
@@ -809,10 +827,10 @@ function WorkspacePaneView({
   tab,
   tabOptions,
   target,
-  themeMode,
+    themeMode,
 }: WorkspacePaneViewProps) {
   return (
-    <section className={`workspace-pane workspace-pane--${target}`}>
+    <section className={`workspace-pane workspace-pane--${target}`} data-testid={`workspace-pane-${target}`}>
       <header className="workspace-pane__header">
         <div className="workspace-pane__meta">
           <span className="workspace-pane__eyebrow">{label}</span>
@@ -821,7 +839,12 @@ function WorkspacePaneView({
         <div className="workspace-pane__controls">
           <label className="workspace-pane__picker">
             <span>View</span>
-            <select value={tab?.id ?? orchestrationTabId} onChange={(event) => onSelectTab(target, event.target.value)}>
+            <select
+              aria-label={`${label} view`}
+              data-testid={`workspace-pane-picker-${target}`}
+              value={tab?.id ?? orchestrationTabId}
+              onChange={(event) => onSelectTab(target, event.target.value)}
+            >
               {tabOptions.map((option) => (
                 <option key={option.tabId} value={option.tabId}>
                   {option.label}
@@ -834,6 +857,7 @@ function WorkspacePaneView({
               <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
               <button
                 className="button button--ghost"
+                data-testid={`stop-session-${session.id}`}
                 onClick={() => onStopSession(session.id)}
                 disabled={isStoppingSession || session.state !== 'Running'}
                 type="button"
@@ -912,17 +936,29 @@ function OrchestrationBoard({ onOpenSession, sessions, target }: OrchestrationBo
       {sessions.length > 0 ? (
         <div className="orchestration-list">
           {sessions.map((session) => (
-            <article key={session.id} className="orchestration-item">
+            <article key={session.id} className="orchestration-item" data-testid={`orchestration-item-${session.id}`}>
               <div className="orchestration-item__meta">
                 <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
                 <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
                 <p>{session.displayCommand}</p>
               </div>
               <div className="orchestration-item__actions">
-                <button className="button button--ghost" onClick={() => onOpenSession(session, target)} type="button">
+                <button
+                  aria-label={`Open ${session.id}`}
+                  className="button button--ghost"
+                  data-testid={`open-session-${session.id}`}
+                  onClick={() => onOpenSession(session, target)}
+                  type="button"
+                >
                   Open
                 </button>
-                <button className="button button--ghost" onClick={() => onOpenSession(session, 'secondary')} type="button">
+                <button
+                  aria-label={`Compare ${session.id}`}
+                  className="button button--ghost"
+                  data-testid={`compare-session-${session.id}`}
+                  onClick={() => onOpenSession(session, 'secondary')}
+                  type="button"
+                >
                   Compare
                 </button>
               </div>
@@ -981,7 +1017,7 @@ interface BackplaneEditorProps {
 
 function BackplaneEditor({ backplane, onChange, onRemove }: BackplaneEditorProps) {
   return (
-    <article className="config-card">
+    <article className="config-card" data-testid={`backplane-card-${backplane.id}`}>
       <header className="config-card__header">
         <strong>{backplane.id}</strong>
         <button className="button button--ghost" onClick={onRemove} type="button">
@@ -1026,7 +1062,7 @@ interface HostEditorProps {
 
 function HostEditor({ host, backplanes, onChange, onRemove }: HostEditorProps) {
   return (
-    <article className="config-card">
+    <article className="config-card" data-testid={`host-card-${host.id}`}>
       <header className="config-card__header">
         <strong>{host.id}</strong>
         <button className="button button--ghost" onClick={onRemove} type="button">
@@ -1120,7 +1156,7 @@ interface ConnectorEditorProps {
 
 function ConnectorEditor({ connector, onChange, onRemove }: ConnectorEditorProps) {
   return (
-    <article className="config-card">
+    <article className="config-card" data-testid={`connector-card-${connector.id}`}>
       <header className="config-card__header">
         <strong>{connector.id}</strong>
         <button className="button button--ghost" onClick={onRemove} type="button">

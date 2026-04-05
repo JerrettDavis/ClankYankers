@@ -88,6 +88,7 @@ internal sealed class WindowsConPtyProcess : IInteractiveSession
     {
         if (Interlocked.Exchange(ref _stopped, 1) == 1)
         {
+            RequestShutdown();
             await WaitForCompletionAsync(cancellationToken);
             return;
         }
@@ -102,12 +103,19 @@ internal sealed class WindowsConPtyProcess : IInteractiveSession
         {
         }
 
-        await WaitForCompletionAsync(cancellationToken);
+        try
+        {
+            await WaitForCompletionAsync(cancellationToken);
+        }
+        finally
+        {
+            RequestShutdown();
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _shutdown.Cancel();
+        RequestShutdown();
 
         try
         {
@@ -223,6 +231,21 @@ internal sealed class WindowsConPtyProcess : IInteractiveSession
         catch (ObjectDisposedException) when (_shutdown.IsCancellationRequested)
         {
             _completion.TrySetResult(null);
+        }
+        finally
+        {
+            RequestShutdown();
+        }
+    }
+
+    private void RequestShutdown()
+    {
+        try
+        {
+            _shutdown.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 

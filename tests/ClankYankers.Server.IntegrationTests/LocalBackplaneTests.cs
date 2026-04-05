@@ -1,6 +1,9 @@
 using ClankYankers.Server.Core.Models;
+using ClankYankers.Server.Features.Sessions;
 using ClankYankers.Server.Infrastructure.Backplanes;
+using ClankYankers.Server.Infrastructure.Observability;
 using ClankYankers.Server.Infrastructure.Pty;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClankYankers.Server.IntegrationTests;
 
@@ -159,5 +162,121 @@ public sealed class LocalBackplaneTests
 
         Assert.DoesNotContain("session-b", outputA, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("session-a", outputB, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Local_backplane_stop_completes_wrapped_session_cleanup()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var backplane = new LocalBackplane(new WindowsConPtyProcessFactory());
+
+        await using var interactiveSession = await backplane.StartAsync(
+            "local-stop",
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe",
+                ShellArguments = ["-NoLogo"]
+            },
+            new LaunchSpec
+            {
+                SessionId = "local-stop",
+                DisplayCommand = "pwsh.exe -NoLogo",
+                FileName = "pwsh.exe",
+                Arguments = ["-NoLogo"],
+                Cols = 120,
+                Rows = 32
+            },
+            CancellationToken.None);
+
+        var session = new Session(
+            interactiveSession,
+            new SessionSummary
+            {
+                Id = "local-stop",
+                BackplaneId = "local",
+                HostId = "local-host",
+                ConnectorId = "shell",
+                DisplayCommand = "pwsh.exe -NoLogo",
+                State = SessionState.Running,
+                CreatedAt = DateTimeOffset.UtcNow,
+                StartedAt = DateTimeOffset.UtcNow
+            },
+            new InMemoryEventBus(),
+            NullLogger<Session>.Instance);
+
+        await session.StopAsync(CancellationToken.None);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline && session.Summary.State != SessionState.Stopped)
+        {
+            await Task.Delay(25);
+        }
+
+        Assert.Equal(SessionState.Stopped, session.Summary.State);
+    }
+
+    [Fact]
+    public async Task Local_backplane_natural_exit_completes_wrapped_session_cleanup()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var backplane = new LocalBackplane(new WindowsConPtyProcessFactory());
+
+        await using var interactiveSession = await backplane.StartAsync(
+            "local-exit",
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe",
+                ShellArguments = ["-NoLogo"]
+            },
+            new LaunchSpec
+            {
+                SessionId = "local-exit",
+                DisplayCommand = "pwsh.exe -NoLogo",
+                FileName = "pwsh.exe",
+                Arguments = ["-NoLogo"],
+                Cols = 120,
+                Rows = 32
+            },
+            CancellationToken.None);
+
+        var session = new Session(
+            interactiveSession,
+            new SessionSummary
+            {
+                Id = "local-exit",
+                BackplaneId = "local",
+                HostId = "local-host",
+                ConnectorId = "shell",
+                DisplayCommand = "pwsh.exe -NoLogo",
+                State = SessionState.Running,
+                CreatedAt = DateTimeOffset.UtcNow,
+                StartedAt = DateTimeOffset.UtcNow
+            },
+            new InMemoryEventBus(),
+            NullLogger<Session>.Instance);
+
+        await session.WriteInputAsync("exit\r\n", CancellationToken.None);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline && session.Summary.State != SessionState.Stopped)
+        {
+            await Task.Delay(25);
+        }
+
+        Assert.Equal(SessionState.Stopped, session.Summary.State);
     }
 }
