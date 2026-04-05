@@ -62,7 +62,7 @@ describe('App', () => {
   it('renders the launch controls and empty terminal state', async () => {
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: /dial in a fresh runtime/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /new session/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /launch session/i })).toBeInTheDocument()
     expect(screen.getAllByText(/no live sessions yet/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /save config/i })).toBeInTheDocument()

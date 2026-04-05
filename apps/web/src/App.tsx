@@ -304,26 +304,27 @@ function App() {
       </a>
       <div className="app-shell">
         <header className="masthead">
-          <div className="masthead__copy">
+          <div className="masthead__brand">
             <p className="eyebrow">Browser terminal cockpit</p>
-            <h1>ClankYankers</h1>
-            <p className="masthead__lede">
-              A local control deck for shells and agent runtimes, with clean system-aware chrome
-              around a properly docked console.
-            </p>
+            <div className="masthead__title">
+              <h1>ClankYankers</h1>
+              <p className="masthead__lede">Local shell and agent runtime control deck.</p>
+            </div>
           </div>
-          <div className="masthead__status">
-            <div className="status-chip">
-              <span className="status-chip__label">Deck status</span>
-              <strong>{statusMessage}</strong>
-            </div>
-            <div className="status-chip">
-              <span className="status-chip__label">Live sessions</span>
-              <strong>{sessions.length}</strong>
-            </div>
-            <div className="status-chip">
-              <span className="status-chip__label">System theme</span>
-              <strong>{themeMode === 'dark' ? 'Dark mode' : 'Light mode'}</strong>
+          <div className="masthead__meta">
+            <div className="masthead__status">
+              <div className="status-chip">
+                <span className="status-chip__label">Deck status</span>
+                <strong>{statusMessage}</strong>
+              </div>
+              <div className="status-chip">
+                <span className="status-chip__label">Live sessions</span>
+                <strong>{sessions.length}</strong>
+              </div>
+              <div className="status-chip">
+                <span className="status-chip__label">System theme</span>
+                <strong>{themeMode === 'dark' ? 'Dark mode' : 'Light mode'}</strong>
+              </div>
             </div>
             <div className="header-actions">
               <button className="button button--ghost" onClick={() => void refreshSessions()} type="button">
@@ -361,7 +362,7 @@ function App() {
               <div className="panel__header">
                 <div>
                   <p className="eyebrow">Session launch</p>
-                  <h2>Dial in a fresh runtime</h2>
+                  <h2>New session</h2>
                 </div>
               </div>
 
@@ -438,11 +439,118 @@ function App() {
               </form>
             </section>
 
+            <details className="panel panel--settings" open>
+              <summary>
+                <div>
+                  <p className="eyebrow">Configuration manifest</p>
+                  <h2>Runtime config</h2>
+                </div>
+              </summary>
+              <div className="panel--settings__body">
+                <ConfigBlock
+                  title="Backplanes"
+                  description="Execution fabrics available to new sessions."
+                  actionLabel="Add backplane"
+                  onAdd={() =>
+                    updateConfigDraft((current) => ({
+                      ...current,
+                      backplanes: [...current.backplanes, createBackplaneDefinition()],
+                    }))
+                  }
+                >
+                  {configDraft.backplanes.map((backplane, index) => (
+                    <BackplaneEditor
+                      key={backplane.id}
+                      backplane={backplane}
+                      onChange={(nextValue) =>
+                        updateConfigDraft((current) => ({
+                          ...current,
+                          backplanes: updateItem(current.backplanes, index, nextValue),
+                        }))
+                      }
+                      onRemove={() =>
+                        updateConfigDraft((current) => ({
+                          ...current,
+                          backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
+                        }))
+                      }
+                    />
+                  ))}
+                </ConfigBlock>
+
+                <ConfigBlock
+                  title="Hosts"
+                  description="Concrete local or container targets exposed by each backplane."
+                  actionLabel="Add host"
+                  onAdd={() =>
+                    updateConfigDraft((current) => ({
+                      ...current,
+                      hosts: [
+                        ...current.hosts,
+                        createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
+                      ],
+                    }))
+                  }
+                >
+                  {configDraft.hosts.map((host, index) => (
+                    <HostEditor
+                      key={host.id}
+                      host={host}
+                      backplanes={configDraft.backplanes}
+                      onChange={(nextValue) =>
+                        updateConfigDraft((current) => ({
+                          ...current,
+                          hosts: updateItem(current.hosts, index, nextValue),
+                        }))
+                      }
+                      onRemove={() =>
+                        updateConfigDraft((current) => ({
+                          ...current,
+                          hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
+                        }))
+                      }
+                    />
+                  ))}
+                </ConfigBlock>
+
+                <ConfigBlock
+                  title="Connectors"
+                  description="CLI adapters mapped into each session."
+                  actionLabel="Add connector"
+                  onAdd={() =>
+                    updateConfigDraft((current) => ({
+                      ...current,
+                      connectors: [...current.connectors, createConnectorDefinition()],
+                    }))
+                  }
+                >
+                  {configDraft.connectors.map((connector, index) => (
+                    <ConnectorEditor
+                      key={connector.id}
+                      connector={connector}
+                      onChange={(nextValue) =>
+                        updateConfigDraft((current) => ({
+                          ...current,
+                          connectors: updateItem(current.connectors, index, nextValue),
+                        }))
+                      }
+                      onRemove={() =>
+                        updateConfigDraft((current) => ({
+                          ...current,
+                          connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
+                        }))
+                      }
+                    />
+                  ))}
+                </ConfigBlock>
+              </div>
+            </details>
+
             <section className="panel panel--manifest">
               <div className="panel__header">
                 <div>
                   <p className="eyebrow">Session manifest</p>
-                  <h2>Pick up where you left off</h2>
+                  <h2>Sessions</h2>
                 </div>
               </div>
 
@@ -475,112 +583,6 @@ function App() {
                 </div>
               )}
             </section>
-
-            <details className="panel panel--settings" open>
-              <summary>
-                <div>
-                  <p className="eyebrow">Configuration manifest</p>
-                  <h2>Adjust backplanes, hosts, and connectors</h2>
-                </div>
-              </summary>
-
-              <ConfigBlock
-                title="Backplanes"
-                description="Execution fabrics available to new sessions."
-                actionLabel="Add backplane"
-                onAdd={() =>
-                  updateConfigDraft((current) => ({
-                    ...current,
-                    backplanes: [...current.backplanes, createBackplaneDefinition()],
-                  }))
-                }
-              >
-                {configDraft.backplanes.map((backplane, index) => (
-                  <BackplaneEditor
-                    key={backplane.id}
-                    backplane={backplane}
-                    onChange={(nextValue) =>
-                      updateConfigDraft((current) => ({
-                        ...current,
-                        backplanes: updateItem(current.backplanes, index, nextValue),
-                      }))
-                    }
-                    onRemove={() =>
-                      updateConfigDraft((current) => ({
-                        ...current,
-                        backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
-                      }))
-                    }
-                  />
-                ))}
-              </ConfigBlock>
-
-              <ConfigBlock
-                title="Hosts"
-                description="Concrete local or container targets exposed by each backplane."
-                actionLabel="Add host"
-                onAdd={() =>
-                  updateConfigDraft((current) => ({
-                    ...current,
-                    hosts: [
-                      ...current.hosts,
-                      createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
-                    ],
-                  }))
-                }
-              >
-                {configDraft.hosts.map((host, index) => (
-                  <HostEditor
-                    key={host.id}
-                    host={host}
-                    backplanes={configDraft.backplanes}
-                    onChange={(nextValue) =>
-                      updateConfigDraft((current) => ({
-                        ...current,
-                        hosts: updateItem(current.hosts, index, nextValue),
-                      }))
-                    }
-                    onRemove={() =>
-                      updateConfigDraft((current) => ({
-                        ...current,
-                        hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
-                      }))
-                    }
-                  />
-                ))}
-              </ConfigBlock>
-
-              <ConfigBlock
-                title="Connectors"
-                description="CLI adapters mapped into each session."
-                actionLabel="Add connector"
-                onAdd={() =>
-                  updateConfigDraft((current) => ({
-                    ...current,
-                    connectors: [...current.connectors, createConnectorDefinition()],
-                  }))
-                }
-              >
-                {configDraft.connectors.map((connector, index) => (
-                  <ConnectorEditor
-                    key={connector.id}
-                    connector={connector}
-                    onChange={(nextValue) =>
-                      updateConfigDraft((current) => ({
-                        ...current,
-                        connectors: updateItem(current.connectors, index, nextValue),
-                      }))
-                    }
-                    onRemove={() =>
-                      updateConfigDraft((current) => ({
-                        ...current,
-                        connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
-                      }))
-                    }
-                  />
-                ))}
-              </ConfigBlock>
-            </details>
           </aside>
 
           <section className={`stage${activeSession ? ' stage--active' : ' stage--idle'}`} id="main-content">

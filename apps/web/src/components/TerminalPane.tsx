@@ -18,6 +18,7 @@ interface TerminalPaneProps {
 }
 
 export function TerminalPane({ sessionId, onSessionMessage, themeMode }: TerminalPaneProps) {
+  const frameRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -44,9 +45,10 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
   }, [themeMode])
 
   useLayoutEffect(() => {
+    const frame = frameRef.current
     const host = hostRef.current
     const viewport = viewportRef.current
-    if (!host || !viewport) {
+    if (!frame || !host || !viewport) {
       return undefined
     }
 
@@ -56,6 +58,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       allowTransparency: true,
       cursorBlink: true,
       cursorStyle: 'bar',
+      disableStdin: true,
       fontFamily: '"Cascadia Code", "Iosevka Term", "SFMono-Regular", Consolas, monospace',
       fontSize: 14,
       lineHeight: 1.25,
@@ -68,16 +71,26 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(host)
-    const releaseTerminalPageInteraction = createTerminalPageInteractionRelease(host, () => terminal.blur())
+    const releaseTerminalPageInteraction = createTerminalPageInteractionRelease(frame, () => terminal.blur())
     const outputScrollGuard = createTerminalOutputScrollGuard(host)
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws/session/${sessionId}`)
     let fitFrameId: number | null = null
+    let isInteractive = false
 
     const sendMessage = (message: TerminalClientMessage) => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(message))
+      }
+    }
+
+    const setInteractive = (interactive: boolean) => {
+      isInteractive = interactive
+      terminal.options.disableStdin = !interactive
+
+      if (!interactive) {
+        terminal.blur()
       }
     }
 
@@ -114,6 +127,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
     })
 
     resizeObserver.observe(viewport)
+    resizeObserver.observe(frame)
     scheduleFit()
 
     const dataDisposable = terminal.onData((data) => {
@@ -139,6 +153,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       }
 
       setConnectionState('live')
+      setInteractive(true)
       focusTerminal(host, terminal)
       scheduleFit()
     }
@@ -173,6 +188,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       }
 
       setConnectionState('closed')
+      setInteractive(false)
     }
 
     const handleSocketError = () => {
@@ -181,6 +197,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
       }
 
       setConnectionState('error')
+      setInteractive(false)
     }
 
     socket.addEventListener('open', handleSocketOpen)
@@ -188,8 +205,17 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
     socket.addEventListener('close', handleSocketClose)
     socket.addEventListener('error', handleSocketError)
 
+    const handleFramePointerDown = (event: PointerEvent) => {
+      if (isInteractive && event.target instanceof Node && !host.contains(event.target)) {
+        focusTerminal(host, terminal)
+      }
+    }
+
+    frame.addEventListener('pointerdown', handleFramePointerDown)
+
     return () => {
       isDisposed = true
+      frame.removeEventListener('pointerdown', handleFramePointerDown)
       releaseTerminalPageInteraction()
       outputScrollGuard.dispose()
       resizeDisposable.dispose()
@@ -208,6 +234,7 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
         socket.close()
       }
 
+      setInteractive(false)
       terminal.reset()
       terminal.dispose()
       terminalRef.current = null
@@ -227,7 +254,9 @@ export function TerminalPane({ sessionId, onSessionMessage, themeMode }: Termina
         </div>
       </div>
       <div ref={viewportRef} className="terminal-scrollport">
-        <div ref={hostRef} className="terminal-canvas" />
+        <div ref={frameRef} className="terminal-frame">
+          <div ref={hostRef} className="terminal-canvas" />
+        </div>
       </div>
     </div>
   )
