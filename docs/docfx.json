@@ -1,0 +1,23 @@
+{
+  "metadata": [{
+    "src": [{
+      "src": "../apps/server",
+      "files": [
+        "ClankYankers.Server/**/*.csproj"
+      ]
+    }],
+    "dest": "api"
+  }],
+  "build": {
+    "content": [
+      { "files": ["**/*.yml", "**/*.md"], "src": ".", "exclude": ["_site/**", "api/**"] },
+      { "files": ["**/*.yml"], "src": "api" }
+    ],
+    "dest": "_site",
+    "globalMetadata": {
+      "_appTitle": "ClankYankers",
+      "_enableSearch": true
+    },
+    "template": ["default", "modern"]
+  }
+}
