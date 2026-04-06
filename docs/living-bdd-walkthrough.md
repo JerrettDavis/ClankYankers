@@ -16,13 +16,15 @@ The goal is simple: a teammate should be able to read this file, understand what
   - `tests/ClankYankers.Server.UnitTests/ConnectorTests.cs`
   - `tests/ClankYankers.Server.UnitTests/ConfigAndEventTests.cs`
   - `tests/ClankYankers.Server.UnitTests/SessionOrchestratorTests.cs`
+  - `tests/ClankYankers.Server.UnitTests/ClaudeHomeCatalogTests.cs`
+  - `apps/web/src/App.test.tsx`
 
 ## Current verification baseline
 
 This document reflects the locally verified behavior from the current build:
 
-- Last locally refreshed: **2026-04-05**
-- Latest implementation baseline before this doc pass: **`11df660`** (`feat(connectors): launch real agent CLIs`)
+- Last locally refreshed: **2026-04-06**
+- Latest implementation baseline before this doc pass: **current local working tree after sanitized Claude-home integration**
 
 - `dotnet test ClankYankers.slnx --nologo`
 - `npm test`
@@ -30,7 +32,7 @@ This document reflects the locally verified behavior from the current build:
 - `npm run build`
 - `npx playwright test`
 
-Playwright result at the time of writing: **6 passed, 1 skipped**. The skipped scenario is the Docker runtime flow, which is intentionally capability-gated by local machine support.
+Playwright result at the time of writing: **8 passed, 1 skipped**. The skipped scenario is the Docker runtime flow, which is intentionally capability-gated by local machine support.
 
 ## Verification matrix
 
@@ -43,6 +45,7 @@ Playwright result at the time of writing: **6 passed, 1 skipped**. The skipped s
 | S5 Orchestration, pane layout, and history | Verified in latest run | Two local sessions | Playwright + screenshots |
 | S6 Docker launch path | Capability-gated | Docker daemon/runtime available locally | Playwright skip gate + launch-state screenshot |
 | S7 Ollama agent runtime | Verified in latest run | Local `ollama` install and `qwen3.5:9b` model present | Playwright + screenshots |
+| S8 Claude home catalog and status | Verified in latest run | Local `~/.claude` directory present | Playwright + unit tests + screenshots |
 | Claude live runtime launch | Not exercised in browser E2E on this machine | Local `claude` CLI available | Launch UX screenshots + server/unit coverage |
 
 ## Scenario index
@@ -56,6 +59,7 @@ Playwright result at the time of writing: **6 passed, 1 skipped**. The skipped s
 | S5 | Orchestration, pane layout, and history | Multiple sessions can be split, compared, reopened, and kept in history | `control-deck.spec.ts` - `covers workspace orchestration, compare panes, tab close and stop flows` |
 | S6 | Docker launch path | Docker remains a first-class backplane option when the machine supports it | `control-deck.spec.ts` - `runs docker shell sessions when docker is available` |
 | S7 | Ollama agent runtime | The Ollama connector launches a real local agent CLI and returns model output | `control-deck.spec.ts` - `runs ollama connector sessions when the model is available` |
+| S8 | Claude home catalog and status | The studio surfaces local Claude-home inventory and settings safely, without exposing raw command strings or free-text metadata | `control-deck.spec.ts` - `surfaces Claude home catalog and status across studio pages`; `App.test.tsx`; `ClaudeHomeCatalogTests.cs` |
 
 ---
 
@@ -196,6 +200,27 @@ Playwright result at the time of writing: **6 passed, 1 skipped**. The skipped s
 
 ---
 
+## S8. Claude home catalog and status
+
+**Given** the local machine has a populated `~/.claude` home  
+**When** the operator opens the Agents, Skills, and Settings product pages  
+**Then** the studio surfaces Claude-home-backed inventory and status safely, using sanitized catalog entries and count-based summaries instead of raw local command strings or file contents
+
+| Step | Action | Expected result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Open the Agents page | The studio shows a local Claude agent catalog sourced on demand from the backend and explicitly described as sanitized | ![Claude agent catalog](assets/bdd/claude-agent-catalog.png) |
+| 2 | Open the Skills page | The studio shows local Claude skill inventory and bundled command counts without exposing file paths or frontmatter body text | ![Claude skill catalog](assets/bdd/claude-skill-catalog.png) |
+| 3 | Open the Settings page | The operator can verify Claude-home connectivity and safe status signals such as root path display, counts, plugin totals, and override posture | ![Claude settings status](assets/bdd/claude-settings-status.png) |
+
+**What this means in practice**
+
+- Local Claude assets are now visible as a first-class product surface, not just an implementation detail.
+- The browser no longer receives raw `statusLine.command` text or free-form catalog metadata from `~/.claude`.
+- Claude-home discovery failures degrade safely instead of taking the app offline.
+- Browser coverage now explicitly exercises the Claude-home-backed product pages.
+
+---
+
 ## Additional contract coverage behind the UI
 
 The browser walkthrough above focuses on observable user behavior. The following critical behaviors are also enforced below the UI layer:
@@ -215,6 +240,7 @@ The browser walkthrough above focuses on observable user behavior. The following
    - Saved config requires at least one enabled end-to-end launch path.
    - Enabled resources must have runtime-critical fields present.
    - Claude connectors cannot smuggle model or permission flags through arbitrary launch arguments.
+   - Claude-home bootstrap exposes only safe counts and flags, while detailed catalog data is loaded explicitly through a sanitized endpoint.
 
 These behaviors are covered in the unit test suite even when they do not produce a separate user-visible screenshot.
 
@@ -228,6 +254,7 @@ Today, ClankYankers demonstrably does the following:
 - persists and enforces runtime configuration
 - differentiates shell and agent-launch connectors in the UI
 - launches a real Ollama agent CLI locally
+- surfaces local `~/.claude` agent and skill inventory safely in the studio shell
 - supports workspace orchestration with multi-session panes and reopenable history
 - keeps the whole control deck theme-aware, contained, and responsive
 
@@ -235,8 +262,11 @@ The safest way to keep this document alive is to update it whenever any of these
 
 - `apps/web/e2e/control-deck.spec.ts`
 - `apps/web/src/App.tsx`
+- `apps/web/src/App.test.tsx`
 - `apps/web/src/index.css`
 - `apps/server/ClankYankers.Server/Features/Sessions/*`
+- `apps/server/ClankYankers.Server/Features/ClaudeHome/*`
+- `apps/server/ClankYankers.Server/Infrastructure/ClaudeHome/*`
 - `apps/server/ClankYankers.Server/Infrastructure/Connectors/*`
 
 ---
@@ -273,4 +303,7 @@ The safest way to keep this document alive is to update it whenever any of these
    - `docker-launch-target.png`
    - `ollama-launch.png`
    - `ollama-response.png`
+   - `claude-agent-catalog.png`
+   - `claude-skill-catalog.png`
+   - `claude-settings-status.png`
 6. Update this file whenever scenario names, prerequisites, automation status, or screenshot evidence changes

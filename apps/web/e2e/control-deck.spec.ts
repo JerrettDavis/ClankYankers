@@ -97,6 +97,22 @@ test('scaffolds dashboard sections across the studio shell', async ({ page }) =>
   await openSection(page, 'settings', 'Studio settings and operating posture')
 })
 
+test('surfaces Claude home catalog and status across studio pages', async ({ page }) => {
+  await openDeck(page)
+
+  await openSection(page, 'agents', 'Local Claude agent catalog')
+  await expect(page.getByText(/sanitized catalog endpoint/i)).toBeVisible()
+  await page.getByTestId('refresh-sessions').click()
+  await expect(page.getByRole('heading', { name: 'Local Claude agent catalog' })).toBeVisible()
+
+  await openSection(page, 'skills', 'Local Claude skill catalog')
+  await expect(page.getByText(/without exposing file paths or frontmatter copy/i)).toBeVisible()
+
+  await openSection(page, 'settings', 'Studio settings and operating posture')
+  await expect(page.getByRole('heading', { name: 'Local integration status' })).toBeVisible()
+  await expect(page.getByText('~/.claude', { exact: true })).toBeVisible()
+})
+
 test('persists config changes and discards unsaved edits', async ({ page }) => {
   await openDeck(page)
   await openWorkspace(page)

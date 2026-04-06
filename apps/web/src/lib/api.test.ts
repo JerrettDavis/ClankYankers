@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { AppConfig } from '../types'
-import { saveConfig, stopSession } from './api'
+import type { AppConfig, ClaudeHomeCatalogResponse } from '../types'
+import { loadClaudeHomeCatalog, saveConfig, stopSession } from './api'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -78,5 +78,21 @@ describe('api client', () => {
         },
       },
     })
+  })
+
+  it('loads the explicit Claude home catalog endpoint', async () => {
+    const catalog: ClaudeHomeCatalogResponse = {
+      agents: [{ name: 'frontend-developer', commandCount: 0 }],
+      skills: [{ name: 'brainstorming', commandCount: 1 }],
+    }
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(catalog), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await expect(loadClaudeHomeCatalog()).resolves.toEqual(catalog)
   })
 })
