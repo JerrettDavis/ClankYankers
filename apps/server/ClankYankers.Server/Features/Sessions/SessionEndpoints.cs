@@ -1,5 +1,6 @@
 using ClankYankers.Server.Core.Contracts;
 using ClankYankers.Server.Core.Models;
+using ClankYankers.Server.Infrastructure.ClaudeHome;
 
 namespace ClankYankers.Server.Features.Sessions;
 
@@ -10,13 +11,15 @@ public static class SessionEndpoints
         group.MapGet("/app-state", async (
             IConfigStore configStore,
             SessionOrchestrator orchestrator,
+            ClaudeHomeCatalog claudeHomeCatalog,
             CancellationToken cancellationToken) =>
         {
             var config = await configStore.LoadAsync(cancellationToken);
             return Results.Ok(new
             {
                 config,
-                sessions = orchestrator.ListSessions()
+                sessions = orchestrator.ListSessions(),
+                claudeHome = claudeHomeCatalog.Load()
             });
         });
 

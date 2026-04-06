@@ -2,6 +2,8 @@ import type {
   ApiValidationProblem,
   AppConfig,
   AppStateResponse,
+  ClaudeHomeCatalogResponse,
+  ClaudeHomeSummary,
   CreateSessionRequest,
   SessionSummary,
 } from '../types'
@@ -23,6 +25,7 @@ export async function loadAppState(signal?: AbortSignal): Promise<AppStateRespon
   const response = await requestJson<{
     config: AppConfig
     sessions: Array<Omit<SessionSummary, 'state'> & { state: number | string }>
+    claudeHome: ClaudeHomeSummary | null
   }>('/api/app-state', {
     signal,
   })
@@ -30,6 +33,7 @@ export async function loadAppState(signal?: AbortSignal): Promise<AppStateRespon
   return {
     config: response.config,
     sessions: response.sessions.map(normalizeSession),
+    claudeHome: response.claudeHome,
   }
 }
 
@@ -39,6 +43,12 @@ export async function loadSessions(signal?: AbortSignal): Promise<SessionSummary
   })
 
   return response.map(normalizeSession)
+}
+
+export async function loadClaudeHomeCatalog(signal?: AbortSignal): Promise<ClaudeHomeCatalogResponse> {
+  return requestJson<ClaudeHomeCatalogResponse>('/api/claude-home/catalog', {
+    signal,
+  })
 }
 
 export async function createSession(request: CreateSessionRequest): Promise<SessionSummary> {

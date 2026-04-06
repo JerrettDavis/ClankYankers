@@ -56,6 +56,36 @@ export interface SessionSummary {
 export interface AppStateResponse {
   config: AppConfig
   sessions: SessionSummary[]
+  claudeHome: ClaudeHomeSummary | null
+}
+
+export interface ClaudeCatalogEntry {
+  name: string
+  commandCount: number
+}
+
+export interface ClaudeSettingsSummary {
+  hasLocalOverrides: boolean
+  statusLineType: string | null
+  hasStatusLineCommand: boolean
+  voiceEnabled: boolean | null
+  skipDangerousModePermissionPrompt: boolean | null
+  enabledPluginCount: number
+}
+
+export interface ClaudeHomeSummary {
+  rootDisplayPath: string
+  exists: boolean
+  agentCount: number
+  skillCount: number
+  commandCount: number
+  mcpArtifactCount: number
+  settings: ClaudeSettingsSummary | null
+}
+
+export interface ClaudeHomeCatalogResponse {
+  agents: ClaudeCatalogEntry[]
+  skills: ClaudeCatalogEntry[]
 }
 
 export interface CreateSessionRequest {

@@ -10,23 +10,33 @@
   --ink-1: oklch(38% 0.016 265);
   --ink-2: oklch(55% 0.012 265);
   --accent-0: oklch(57% 0.15 268);
+  --accent-emphasis: oklch(49% 0.14 268);
   --accent-1: oklch(64% 0.1 246);
   --accent-ghost: color-mix(in oklab, var(--accent-0) 10%, white);
+  --accent-solid: color-mix(in oklab, var(--accent-emphasis) 88%, var(--ink-0));
+  --accent-solid-line: color-mix(in oklab, var(--accent-emphasis) 72%, var(--ink-0));
+  --accent-contrast: oklch(98.4% 0.004 265);
   --line-strong: oklch(83% 0.012 265);
   --line-soft: oklch(90.5% 0.01 265);
   --surface-float: color-mix(in oklab, white 88%, var(--paper-1));
   --surface-card: color-mix(in oklab, white 84%, var(--paper-1));
   --surface-soft: color-mix(in oklab, white 76%, var(--paper-2));
+  --input-surface: color-mix(in oklab, var(--surface-soft) 94%, var(--paper-0));
+  --focus-outline: color-mix(in oklab, var(--accent-emphasis) 74%, var(--paper-0));
+  --focus-ring: color-mix(in oklab, var(--accent-emphasis) 16%, var(--paper-0));
   --success: oklch(61% 0.13 156);
   --danger: oklch(60% 0.18 28);
   --stage: oklch(19% 0.013 265);
   --stage-raised: oklch(23% 0.015 265);
   --stage-line: oklch(32% 0.015 265);
   --stage-text: oklch(94.5% 0.006 265);
+  --stage-stroke: color-mix(in oklab, var(--stage-line) 78%, var(--paper-2));
   --terminal-bg: oklch(17.5% 0.013 265);
   --terminal-raised: oklch(22% 0.015 265);
   --terminal-line: oklch(31% 0.015 265);
   --terminal-text: oklch(94.5% 0.006 265);
+  --terminal-stroke: color-mix(in oklab, var(--terminal-line) 74%, var(--paper-2));
+  --terminal-overlay: color-mix(in oklab, var(--terminal-raised) 90%, var(--paper-0));
   --shadow-lg:
     0 1px 2px rgba(15, 23, 42, 0.08),
     0 8px 18px rgba(15, 23, 42, 0.03);
@@ -66,23 +76,33 @@
   --ink-1: oklch(82% 0.01 265);
   --ink-2: oklch(69% 0.012 265);
   --accent-0: oklch(71% 0.11 255);
+  --accent-emphasis: oklch(76% 0.1 255);
   --accent-1: oklch(78% 0.08 291);
   --accent-ghost: color-mix(in oklab, var(--accent-0) 18%, transparent);
+  --accent-solid: color-mix(in oklab, var(--accent-0) 56%, var(--paper-0));
+  --accent-solid-line: color-mix(in oklab, var(--accent-0) 42%, var(--paper-0));
+  --accent-contrast: oklch(98% 0.004 265);
   --line-strong: oklch(34% 0.012 265);
   --line-soft: oklch(27% 0.012 265);
   --surface-float: color-mix(in oklab, var(--paper-2) 88%, var(--paper-1));
   --surface-card: color-mix(in oklab, var(--paper-2) 74%, var(--paper-1));
   --surface-soft: color-mix(in oklab, var(--paper-2) 62%, var(--paper-1));
+  --input-surface: color-mix(in oklab, var(--surface-soft) 92%, var(--paper-2));
+  --focus-outline: color-mix(in oklab, var(--accent-0) 82%, var(--paper-2));
+  --focus-ring: color-mix(in oklab, var(--accent-0) 24%, var(--paper-2));
   --success: oklch(74% 0.12 155);
   --danger: oklch(72% 0.14 28);
   --stage: oklch(13% 0.01 265);
   --stage-raised: oklch(16.5% 0.012 265);
   --stage-line: oklch(26% 0.012 265);
   --stage-text: oklch(95% 0.007 265);
+  --stage-stroke: color-mix(in oklab, var(--stage-line) 82%, var(--paper-2));
   --terminal-bg: oklch(12.8% 0.01 265);
   --terminal-raised: oklch(16.8% 0.012 265);
   --terminal-line: oklch(25% 0.012 265);
   --terminal-text: oklch(95% 0.007 265);
+  --terminal-stroke: color-mix(in oklab, var(--terminal-line) 82%, var(--paper-2));
+  --terminal-overlay: color-mix(in oklab, var(--terminal-raised) 86%, var(--paper-2));
   --shadow-lg: 0 0 0 rgba(0, 0, 0, 0);
   --shadow-sm: 0 0 0 rgba(0, 0, 0, 0);
 }
@@ -142,7 +162,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid color-mix(in oklab, var(--accent-0) 65%, white);
+  outline: 3px solid var(--focus-outline);
   outline-offset: 3px;
 }
 
@@ -290,7 +310,7 @@ code {
   letter-spacing: 0.14em;
   font-size: 0.64rem;
   font-weight: 700;
-  color: var(--accent-0);
+  color: var(--accent-emphasis);
 }
 
 .header-actions {
@@ -309,8 +329,8 @@ code {
   padding: 0.9rem 1rem;
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--danger) 12%, var(--paper-0));
-  border: 1px solid color-mix(in oklab, var(--danger) 34%, white);
-  color: color-mix(in oklab, var(--danger) 68%, black);
+  border: 1px solid color-mix(in oklab, var(--danger) 34%, var(--paper-0));
+  color: color-mix(in oklab, var(--danger) 68%, var(--ink-0));
 }
 
 .workspace {
@@ -422,12 +442,18 @@ code {
   padding: 0.78rem 0.9rem;
   border-radius: var(--radius-sm);
   border: 1px solid color-mix(in oklab, var(--line-strong) 90%, white);
-  background: color-mix(in oklab, var(--surface-soft) 94%, white);
+  background: var(--input-surface);
   color: var(--ink-0);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
     background-color 180ms ease;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--ink-1);
+  opacity: 1;
 }
 
 .field input:hover,
@@ -437,8 +463,8 @@ code {
 
 .field input:focus,
 .field select:focus {
-  border-color: color-mix(in oklab, var(--accent-0) 52%, white);
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent-0) 12%, white);
+  border-color: color-mix(in oklab, var(--accent-emphasis) 62%, var(--paper-0));
+  box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
 .dimension-grid {
@@ -492,9 +518,9 @@ code {
 }
 
 .button--solid {
-  background: color-mix(in oklab, var(--accent-0) 88%, black);
-  border-color: color-mix(in oklab, var(--accent-0) 68%, black);
-  color: white;
+  background: var(--accent-solid);
+  border-color: var(--accent-solid-line);
+  color: var(--accent-contrast);
 }
 
 .button--ghost {
@@ -567,7 +593,7 @@ code {
   background: color-mix(in oklab, var(--accent-ghost) 86%, var(--surface-card));
   box-shadow:
     inset 0 0 0 1px color-mix(in oklab, var(--accent-0) 18%, white),
-    0 1px 2px rgba(79, 70, 229, 0.08);
+    0 1px 2px color-mix(in oklab, var(--accent-0) 14%, transparent);
 }
 
 .session-state {
@@ -584,8 +610,8 @@ code {
 }
 
 .session-state--running {
-  background: color-mix(in oklab, var(--success) 16%, white);
-  color: color-mix(in oklab, var(--success) 65%, black);
+  background: color-mix(in oklab, var(--success) 16%, var(--paper-0));
+  color: color-mix(in oklab, var(--success) 65%, var(--ink-0));
 }
 
 .session-state--stopped {
@@ -594,13 +620,13 @@ code {
 }
 
 .session-state--failed {
-  background: color-mix(in oklab, var(--danger) 16%, white);
-  color: color-mix(in oklab, var(--danger) 68%, black);
+  background: color-mix(in oklab, var(--danger) 16%, var(--paper-0));
+  color: color-mix(in oklab, var(--danger) 68%, var(--ink-0));
 }
 
 .session-state--starting {
-  background: color-mix(in oklab, var(--accent-1) 20%, white);
-  color: color-mix(in oklab, var(--accent-0) 66%, black);
+  background: color-mix(in oklab, var(--accent-1) 20%, var(--paper-0));
+  color: color-mix(in oklab, var(--accent-emphasis) 72%, var(--ink-0));
 }
 
 .empty-callout,
@@ -873,7 +899,7 @@ code {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  border: 1px solid color-mix(in oklab, var(--terminal-line) 92%, white);
+  border: 1px solid var(--terminal-stroke);
   background: linear-gradient(180deg, var(--terminal-raised), var(--terminal-bg));
   overflow: hidden;
 }
@@ -885,8 +911,8 @@ code {
   justify-content: space-between;
   gap: 0.65rem;
   padding: 0.7rem 0.8rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--terminal-line) 82%, white);
-  background: rgba(255, 255, 255, 0.01);
+  border-bottom: 1px solid color-mix(in oklab, var(--terminal-line) 82%, var(--paper-2));
+  background: var(--terminal-overlay);
 }
 
 .workspace-pane__meta {
@@ -957,7 +983,7 @@ code {
 .workspace-pane__summary > code {
   min-width: 0;
   padding: 0.24rem 0.42rem;
-  border: 1px solid rgba(239, 229, 212, 0.12);
+  border: 1px solid var(--stage-stroke);
   background: color-mix(in oklab, var(--stage-raised) 72%, transparent);
 }
 
@@ -988,7 +1014,7 @@ code {
   display: grid;
   gap: 0.3rem;
   padding: 0.9rem 1rem;
-  border: 1px solid rgba(239, 229, 212, 0.12);
+  border: 1px solid var(--stage-stroke);
   background: color-mix(in oklab, var(--stage-raised) 82%, transparent);
 }
 
@@ -1011,7 +1037,7 @@ code {
   gap: 0.75rem;
   align-items: start;
   padding: 0.9rem 1rem;
-  border: 1px solid rgba(239, 229, 212, 0.12);
+  border: 1px solid var(--stage-stroke);
   background: color-mix(in oklab, var(--stage-raised) 80%, transparent);
 }
 
@@ -1061,7 +1087,7 @@ code {
   min-height: 0;
   block-size: 100%;
   border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in oklab, var(--terminal-line) 92%, white);
+  border: 1px solid var(--terminal-stroke);
   background: linear-gradient(180deg, var(--terminal-raised), var(--terminal-bg));
   overflow: hidden;
   transition: box-shadow 180ms ease, border-color 180ms ease, opacity 160ms ease;
@@ -1076,7 +1102,7 @@ code {
 
 .terminal-shell--live {
   border-color: color-mix(in oklab, var(--accent-0) 24%, var(--terminal-line));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--terminal-text) 8%, transparent);
 }
 
 .terminal-shell__bar {
@@ -1085,8 +1111,8 @@ code {
   justify-content: space-between;
   gap: var(--space-md);
   padding: 0.48rem 0.7rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--terminal-line) 82%, white);
-  background: rgba(255, 255, 255, 0.01);
+  border-bottom: 1px solid color-mix(in oklab, var(--terminal-line) 82%, var(--paper-2));
+  background: var(--terminal-overlay);
 }
 
 .terminal-shell__title {
@@ -1181,7 +1207,7 @@ code {
 .empty-stage__commands span {
   padding: 0.55rem 0.85rem;
   border-radius: 0.12rem;
-  border: 1px solid rgba(239, 229, 212, 0.18);
+  border: 1px solid var(--stage-stroke);
   font-family: var(--mono);
   color: var(--stage-text);
 }

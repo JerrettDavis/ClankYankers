@@ -80,8 +80,26 @@ test('adapts to system theme and stays locked to the viewport', async ({ page })
   }
 })
 
+test('scaffolds dashboard sections across the studio shell', async ({ page }) => {
+  await openDeck(page)
+
+  await expect(page.getByRole('heading', { name: 'One shell, multiple operating surfaces' })).toBeVisible()
+
+  await openSection(page, 'workspace', 'Terminal work stays first-class')
+  await openSection(page, 'sessions', 'Browse the active runtime manifest')
+  await openSection(page, 'backplanes', 'Backplane registry')
+  await openSection(page, 'hosts', 'Launch hosts')
+  await openSection(page, 'connectors', 'Connector definitions')
+  await openSection(page, 'lab', 'Run structured experiments')
+  await openSection(page, 'agents', 'Local Claude agent catalog')
+  await openSection(page, 'skills', 'Local Claude skill catalog')
+  await openSection(page, 'mcp', 'Claude MCP and plugin surfaces')
+  await openSection(page, 'settings', 'Studio settings and operating posture')
+})
+
 test('persists config changes and discards unsaved edits', async ({ page }) => {
   await openDeck(page)
+  await openWorkspace(page)
   await openConfigPanel(page)
 
   const localBackplaneCard = page.getByTestId('backplane-card-local')
@@ -89,7 +107,7 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
 
   await expect(page.getByTestId('save-config')).toBeEnabled()
   await page.getByTestId('save-config').click()
-  await expect(page.getByText('Configuration saved.')).toBeVisible()
+  await expect(page.getByText(/config saved/i)).toBeVisible()
 
   await page.reload()
   await waitForDeck(page)
@@ -109,7 +127,7 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
   await claudeConnectorCard.getByLabel('Allowed tools').fill('Read, Edit')
 
   await page.getByTestId('save-config').click()
-  await expect(page.getByText('Configuration saved.')).toBeVisible()
+  await expect(page.getByText(/config saved/i)).toBeVisible()
 
   await page.reload()
   await waitForDeck(page)
@@ -124,6 +142,7 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
 
 test('shows connector-specific launch overrides for client CLIs', async ({ page }) => {
   await openDeck(page)
+  await openWorkspace(page)
 
   await page.getByTestId('launch-connector').selectOption('claude')
   await expect(page.getByTestId('launch-overrides')).toBeVisible()
@@ -140,6 +159,7 @@ test('shows connector-specific launch overrides for client CLIs', async ({ page 
 
 test('runs local shell flows end to end and records audit events', async ({ page, request }) => {
   await openDeck(page)
+  await openWorkspace(page)
 
   const sessionId = await launchSession(page, request)
   const primaryPane = page.getByTestId('workspace-pane-primary')
@@ -171,6 +191,7 @@ test('runs local shell flows end to end and records audit events', async ({ page
 
 test('covers workspace orchestration, compare panes, tab close and stop flows', async ({ page, request }) => {
   await openDeck(page)
+  await openWorkspace(page)
 
   const sessionA = await launchSession(page, request)
   const sessionB = await launchSession(page, request)
@@ -201,6 +222,11 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
     await expect(page.getByTestId('split-vertical')).toBeDisabled()
     await page.getByRole('button', { name: 'Orchestration' }).click()
     await expect(page.getByTestId(`compare-session-${sessionA}`)).toBeDisabled()
+    await page.getByTestId('nav-section-sessions').click()
+    await expect(page.getByRole('button', { name: 'Compare' }).first()).toBeDisabled()
+    await page.getByTestId('nav-section-overview').click()
+    await expect(page.getByRole('button', { name: 'Compare' }).first()).toBeDisabled()
+    await openWorkspace(page)
 
     await page.setViewportSize({ width: 1180, height: 700 })
     await expect(page.getByTestId('workspace-pane-secondary')).toHaveCount(0)
@@ -213,7 +239,7 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
     await page.getByTestId(`workspace-tab-session:${sessionB}`).click()
     await expect(page.getByTestId(`stop-session-${sessionB}`)).toBeVisible()
     await page.getByTestId('split-horizontal').click()
-    await expect(page.getByText('Split rows')).toBeVisible()
+    await expect(page.getByRole('banner').getByText('Split rows')).toBeVisible()
 
     await secondaryPane.getByTestId('workspace-pane-picker-secondary').selectOption('workspace:orchestration')
     await expect(secondaryPane.getByText('Live sessions')).toBeVisible()
@@ -264,6 +290,7 @@ test('runs docker shell sessions when docker is available', async ({ page, reque
   test.skip(!dockerAvailable, 'Docker is not available on this machine.')
 
   await openDeck(page)
+  await openWorkspace(page)
 
   await page.getByTestId('launch-backplane').selectOption('docker')
   await expect(page.getByTestId('launch-host')).toHaveValue('docker-local')
@@ -290,6 +317,7 @@ test('runs ollama connector sessions when the model is available', async ({ page
   test.setTimeout(300_000)
 
   await openDeck(page)
+  await openWorkspace(page)
 
   await page.getByTestId('launch-connector').selectOption('ollama')
   const sessionId = await launchSession(page, request)
@@ -315,8 +343,17 @@ async function openDeck(page: Page) {
 }
 
 async function waitForDeck(page: Page) {
-  await expect(page.getByRole('heading', { name: 'New session' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Workspace', exact: true })).toBeVisible()
+  await expect(page.locator('.studio-shell')).toBeVisible()
+  await expect(page.getByTestId('nav-section-workspace')).toBeVisible()
+}
+
+async function openWorkspace(page: Page) {
+  await openSection(page, 'workspace', 'Terminal work stays first-class')
+}
+
+async function openSection(page: Page, section: string, heading: string) {
+  await page.getByTestId(`nav-section-${section}`).click()
+  await expect(page.getByRole('heading', { name: heading })).toBeVisible()
 }
 
 async function openConfigPanel(page: Page) {

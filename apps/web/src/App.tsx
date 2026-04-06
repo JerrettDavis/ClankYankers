@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 
 import { TerminalPane } from './components/TerminalPane'
-import { ApiError, createSession, loadAppState, loadSessions, saveConfig, stopSession } from './lib/api'
+import { ApiError, createSession, loadAppState, loadClaudeHomeCatalog, loadSessions, saveConfig, stopSession } from './lib/api'
 import {
   coerceLaunchDraft,
   createBackplaneDefinition,
@@ -33,6 +33,8 @@ import {
 import type {
   AppConfig,
   BackplaneDefinition,
+  ClaudeHomeCatalogResponse,
+  ClaudeHomeSummary,
   ConnectorDefinition,
   HostConfig,
   SessionSummary,
@@ -40,13 +42,199 @@ import type {
 } from './types'
 
 type ThemeMode = 'light' | 'dark'
+type StudioSection =
+  | 'overview'
+  | 'workspace'
+  | 'sessions'
+  | 'backplanes'
+  | 'hosts'
+  | 'connectors'
+  | 'lab'
+  | 'agents'
+  | 'skills'
+  | 'mcp'
+  | 'settings'
+
+interface StudioSectionMeta {
+  description: string
+  eyebrow: string
+  label: string
+}
+
+interface MetricItem {
+  detail?: string
+  label: string
+  value: number | string
+}
+
+interface BlueprintCard {
+  badge: string
+  description: string
+  eyebrow: string
+  title: string
+}
+
 const compactWorkspaceQuery = '(max-width: 720px), (max-height: 760px)'
+const defaultStudioSection: StudioSection = 'overview'
+const studioNavigation: Array<{ items: StudioSection[]; title: string }> = [
+  {
+    title: 'Operate',
+    items: ['overview', 'workspace', 'sessions', 'lab'],
+  },
+  {
+    title: 'Runtime',
+    items: ['backplanes', 'hosts', 'connectors', 'mcp'],
+  },
+  {
+    title: 'Definitions',
+    items: ['agents', 'skills', 'settings'],
+  },
+]
+const studioSectionMeta: Record<StudioSection, StudioSectionMeta> = {
+  overview: {
+    eyebrow: 'Studio overview',
+    label: 'Overview',
+    description: 'Runtime health, inventory, and the next operational moves across the local studio.',
+  },
+  workspace: {
+    eyebrow: 'Terminal workspace',
+    label: 'Workspace',
+    description: 'Launch sessions, compare panes, and orchestrate long-lived terminals without losing fidelity.',
+  },
+  sessions: {
+    eyebrow: 'Session fleet',
+    label: 'Sessions',
+    description: 'Review live and recent sessions, reopen context quickly, and route work back into the workspace.',
+  },
+  backplanes: {
+    eyebrow: 'Execution fabrics',
+    label: 'Backplanes',
+    description: 'Define where commands execute and how each host fabric is exposed to the studio.',
+  },
+  hosts: {
+    eyebrow: 'Host inventory',
+    label: 'Hosts',
+    description: 'Curate local and container host targets, shell defaults, and working directory policies.',
+  },
+  connectors: {
+    eyebrow: 'Connector catalog',
+    label: 'Connectors',
+    description: 'Shape how shells and agent CLIs launch, what defaults they inherit, and what tools they can use.',
+  },
+  lab: {
+    eyebrow: 'Experiment lab',
+    label: 'Lab',
+    description: 'Scaffold repeatable experiments, side-by-side evaluations, and runtime verification recipes.',
+  },
+  agents: {
+    eyebrow: 'Agent definitions',
+    label: 'Agents',
+    description: 'Design reusable agent roles, guardrails, prompts, and execution surfaces for future orchestration.',
+  },
+  skills: {
+    eyebrow: 'Skill definitions',
+    label: 'Skills',
+    description: 'Organize reusable capabilities, tool bundles, and operator guidance around connector workflows.',
+  },
+  mcp: {
+    eyebrow: 'MCP server registry',
+    label: 'MCP servers',
+    description: 'Map transport endpoints, scopes, and operational readiness for local and remote MCP surfaces.',
+  },
+  settings: {
+    eyebrow: 'Control surfaces',
+    label: 'Settings',
+    description: 'Review persistence, theme behavior, polling cadence, and other studio-wide operating defaults.',
+  },
+}
+const labBlueprints: BlueprintCard[] = [
+  {
+    eyebrow: 'Runtime parity',
+    title: 'Connector sweep',
+    badge: 'Scaffolded',
+    description: 'Compare shell, Claude, and Ollama launch envelopes across identical host targets before a release.',
+  },
+  {
+    eyebrow: 'Workspace rehearsal',
+    title: 'Multi-pane walkthrough',
+    badge: 'Ready',
+    description: 'Pin a primary session, open a compare pane, and record the exact state transitions needed for E2E.',
+  },
+  {
+    eyebrow: 'Capability gate',
+    title: 'Docker availability drill',
+    badge: 'Conditional',
+    description: 'Track which experiments require Docker or model presence so the lab can explain skipped coverage.',
+  },
+]
+const agentBlueprints: BlueprintCard[] = [
+  {
+    eyebrow: 'Operator role',
+    title: 'Runtime shepherd',
+    badge: 'Draft',
+    description: 'Own launch policy, backplane choice, and recovery steps for live session operations.',
+  },
+  {
+    eyebrow: 'Evaluation role',
+    title: 'Experiment reviewer',
+    badge: 'Draft',
+    description: 'Inspect transcripts, compare outputs, and mark experiments ready for publication into the lab.',
+  },
+  {
+    eyebrow: 'Safety role',
+    title: 'Policy sentinel',
+    badge: 'Draft',
+    description: 'Check connector permissions, allowed tools, and unsafe launch flags before runtime changes ship.',
+  },
+]
+const skillBlueprints: BlueprintCard[] = [
+  {
+    eyebrow: 'Tooling bundle',
+    title: 'Session recovery kit',
+    badge: 'Concept',
+    description: 'Wrap transcript replay, reconnect guidance, and session manifest inspection into a reusable operator skill.',
+  },
+  {
+    eyebrow: 'Connector bundle',
+    title: 'Model tuning starter',
+    badge: 'Concept',
+    description: 'Preload preferred launch flags, model overrides, and comparison steps for local model experiments.',
+  },
+  {
+    eyebrow: 'Governance bundle',
+    title: 'Compliance snapshot',
+    badge: 'Concept',
+    description: 'Collect WCAG, theme, and runtime policy checks into a repeatable review skill for release candidates.',
+  },
+]
+const mcpBlueprints: BlueprintCard[] = [
+  {
+    eyebrow: 'Filesystem',
+    title: 'Workspace context server',
+    badge: 'Planned',
+    description: 'Expose project snapshots, living docs, and checkpoint artifacts through a scoped local transport.',
+  },
+  {
+    eyebrow: 'Source control',
+    title: 'Git automation server',
+    badge: 'Planned',
+    description: 'Surface repo status, commit policies, and change review helpers without leaving the studio shell.',
+  },
+  {
+    eyebrow: 'Browser',
+    title: 'Review evidence server',
+    badge: 'Planned',
+    description: 'Publish screenshots, BDD evidence, and verification traces as first-class operational assets.',
+  },
+]
 
 function App() {
   const themeMode = useSystemTheme()
   const compactWorkspace = useCompactWorkspace()
   const [savedConfig, setSavedConfig] = useState<AppConfig | null>(null)
   const [configDraft, setConfigDraft] = useState<AppConfig | null>(null)
+  const [claudeHome, setClaudeHome] = useState<ClaudeHomeSummary | null>(null)
+  const [claudeCatalog, setClaudeCatalog] = useState<ClaudeHomeCatalogResponse | null>(null)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [launchDraft, setLaunchDraft] = useState<LaunchDraft>({
     backplaneId: '',
@@ -65,6 +253,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState<string>('Control deck ready.')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [configDirty, setConfigDirty] = useState(false)
+  const activeSection = useStudioSection()
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -86,6 +275,8 @@ function App() {
       const state = await loadAppState()
       setSavedConfig(state.config)
       setConfigDraft(state.config)
+      setClaudeHome(state.claudeHome)
+      setClaudeCatalog(null)
       setSessions(state.sessions)
       setWorkspace(createInitialWorkspace(state.sessions))
       setLaunchDraft(coerceLaunchDraft(state.config))
@@ -98,9 +289,53 @@ function App() {
     }
   }, [])
 
+  const refreshStudioData = useCallback(async () => {
+    try {
+      setIsRefreshing(true)
+      setErrorMessage(null)
+
+      const nextState = await loadAppState()
+      setSessions(nextState.sessions)
+      setClaudeHome(nextState.claudeHome)
+
+      if (activeSection === 'agents' || activeSection === 'skills') {
+        setClaudeCatalog(nextState.claudeHome?.exists ? await loadClaudeHomeCatalog() : null)
+      }
+    } catch (error) {
+      setErrorMessage(asMessage(error))
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [activeSection])
+
   useEffect(() => {
     void loadWorkspace()
   }, [loadWorkspace])
+
+  useEffect(() => {
+    if (!claudeHome?.exists || (activeSection !== 'agents' && activeSection !== 'skills') || claudeCatalog) {
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const nextCatalog = await loadClaudeHomeCatalog()
+        if (!cancelled) {
+          setClaudeCatalog(nextCatalog)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(asMessage(error))
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeSection, claudeCatalog, claudeHome?.exists])
 
   useEffect(() => {
     if (!savedConfig) {
@@ -401,349 +636,958 @@ function App() {
     )
   }
 
+  const activeSectionMeta = studioSectionMeta[activeSection]
+  const claudeSettings = claudeHome?.exists ? claudeHome.settings : null
+  const claudeAgentCount = claudeHome?.exists ? claudeHome.agentCount : 0
+  const claudeSkillCount = claudeHome?.exists ? claudeHome.skillCount : 0
+  const claudeCommandCount = claudeHome?.exists ? claudeHome.commandCount : 0
+  const claudeMcpArtifactCount = claudeHome?.exists ? claudeHome.mcpArtifactCount : 0
+  const catalogAgents = claudeCatalog?.agents ?? []
+  const catalogSkills = claudeCatalog?.skills ?? []
+  const agentCards: BlueprintCard[] =
+    catalogAgents.length > 0
+      ? catalogAgents.slice(0, 12).map((agent) => ({
+          eyebrow: 'Local agent',
+          title: agent.name,
+          badge: 'Catalog',
+          description: 'Discovered from the local Claude home using a sanitized catalog entry.',
+        }))
+      : agentBlueprints
+  const skillCards: BlueprintCard[] =
+    catalogSkills.length > 0
+      ? catalogSkills.slice(0, 12).map((skill) => ({
+          eyebrow: 'Local skill',
+          title: skill.name,
+          badge: skill.commandCount > 0 ? `${skill.commandCount} commands` : 'Skill',
+          description: 'Discovered from the local Claude home using a sanitized catalog entry.',
+        }))
+      : skillBlueprints
+  const mcpCards: BlueprintCard[] =
+    claudeMcpArtifactCount > 0 || (claudeSettings?.enabledPluginCount ?? 0) > 0
+      ? [
+          {
+            eyebrow: 'Local signal',
+            title: 'Claude MCP artifacts',
+            badge: `${claudeMcpArtifactCount}`,
+            description: 'Top-level MCP-related artifacts were discovered in the local Claude home.',
+          },
+          {
+            eyebrow: 'Plugin posture',
+            title: 'Enabled Claude plugins',
+            badge: `${claudeSettings?.enabledPluginCount ?? 0}`,
+            description: 'Only counts are exposed here so local plugin state stays visible without leaking names.',
+          },
+        ]
+      : mcpBlueprints
+  const runningSessionCount = sessions.filter((session) => session.state === 'Running').length
+  const attentionSessionCount = sessions.filter((session) => session.state === 'Failed').length
+  const sessionMetrics: MetricItem[] = [
+    {
+      label: 'Live sessions',
+      value: sessions.length,
+      detail: sessions.length > 0 ? 'Tracked and reconnectable from the workspace.' : 'Ready for the first launch.',
+    },
+    {
+      label: 'Running now',
+      value: runningSessionCount,
+      detail: runningSessionCount > 0 ? 'Streaming terminals are active.' : 'No active runtime processes.',
+    },
+    {
+      label: 'Needs attention',
+      value: attentionSessionCount,
+      detail: attentionSessionCount > 0 ? 'Failed sessions are waiting for review.' : 'No failed sessions detected.',
+    },
+  ]
+  const inventoryMetrics: MetricItem[] = [
+    {
+      label: 'Backplanes',
+      value: savedConfig.backplanes.length,
+      detail: `${enabledBackplanes.length} enabled execution fabrics`,
+    },
+    {
+      label: 'Hosts',
+      value: savedConfig.hosts.length,
+      detail: `${savedConfig.hosts.filter((host) => host.enabled).length} enabled launch targets`,
+    },
+    {
+      label: 'Connectors',
+      value: savedConfig.connectors.length,
+      detail: `${enabledConnectors.length} ready for launch`,
+    },
+    {
+      label: 'Claude assets',
+      value: claudeAgentCount + claudeSkillCount,
+      detail: claudeHome?.exists ? `${claudeAgentCount} agents and ${claudeSkillCount} skills discovered` : 'No ~/.claude catalog detected',
+    },
+  ]
+  const sectionBadges: Record<StudioSection, string | number> = {
+    overview: `${runningSessionCount}/${sessions.length}`,
+    workspace: formatWorkspaceLayout(workspace.layout),
+    sessions: sessions.length,
+    backplanes: savedConfig.backplanes.length,
+    hosts: savedConfig.hosts.length,
+    connectors: savedConfig.connectors.length,
+    lab: labBlueprints.length,
+    agents: claudeAgentCount || agentBlueprints.length,
+    skills: claudeSkillCount || skillBlueprints.length,
+    mcp: claudeMcpArtifactCount || claudeSettings?.enabledPluginCount || mcpBlueprints.length,
+    settings: configDirty ? 'draft' : 'stable',
+  }
+  const openStudioSection = (section: StudioSection) => {
+    setStudioSectionHash(section)
+  }
+  const showConfigActions = ['workspace', 'backplanes', 'hosts', 'connectors'].includes(activeSection)
+  const refreshActionLabel = showConfigActions ? 'Refresh sessions' : 'Refresh'
+  const handleRefreshAction = showConfigActions ? refreshSessions : refreshStudioData
+  const handleOpenWorkspaceSession = (session: SessionSummary, target: 'primary' | 'secondary' = 'primary') => {
+    setStudioSectionHash('workspace')
+    handleOpenSession(session, target)
+  }
+
+  let currentPage: ReactNode
+  switch (activeSection) {
+    case 'workspace':
+      currentPage = (
+        <WorkspacePage
+          activeSession={activeSession}
+          activeTab={activeTab}
+          availableHosts={availableHosts}
+          canSplitWorkspace={canSplitWorkspace}
+          compactWorkspace={compactWorkspace}
+          configDraft={configDraft}
+          enabledBackplanes={enabledBackplanes}
+          enabledConnectors={enabledConnectors}
+          isCreatingSession={isCreatingSession}
+          isSavingConfig={isSavingConfig}
+          isStoppingSession={isStoppingSession}
+          launchDraft={launchDraft}
+          onCloseWorkspaceTab={handleCloseWorkspaceTab}
+          onLaunchSession={handleLaunchSession}
+          onOpenOrchestration={handleOpenOrchestration}
+          onOpenSession={handleOpenSession}
+          onResetDraft={handleResetDraft}
+          onSaveConfig={handleSaveConfig}
+          onSelectPaneTab={handleSelectPaneTab}
+          onSessionMessage={handleSessionMessage}
+          onSetWorkspaceLayout={handleSetWorkspaceLayout}
+          onStopSession={handleStopSession}
+          onUpdateConfigDraft={updateConfigDraft}
+          onUpdateLaunchDraft={updateLaunchDraft}
+          savedConfig={savedConfig}
+          secondarySession={secondarySession}
+          secondaryTab={secondaryTab}
+          selectedConnector={selectedConnector}
+          sessionMetrics={sessionMetrics}
+          sessions={sessions}
+          themeMode={themeMode}
+          workspace={workspace}
+          workspaceTabOptions={workspaceTabOptions}
+        />
+      )
+      break
+    case 'sessions':
+      currentPage = (
+        <SessionsPage
+          compactWorkspace={compactWorkspace}
+          sessions={sessions}
+          sessionMetrics={sessionMetrics}
+          onOpenSection={openStudioSection}
+          onOpenSession={handleOpenWorkspaceSession}
+        />
+      )
+      break
+    case 'backplanes':
+      currentPage = (
+        <InventoryPage
+          eyebrow="Execution fabrics"
+          title="Backplane registry"
+          description="Define the fabrics your studio can launch into, then flow them directly into workspace launches."
+          metrics={[
+            inventoryMetrics[0],
+            { label: 'Enabled', value: enabledBackplanes.length, detail: 'Backplanes currently available for launch.' },
+            { label: 'Kinds', value: new Set(savedConfig.backplanes.map((backplane) => backplane.kind)).size, detail: 'Unique execution fabric types in the registry.' },
+          ]}
+          aside={
+            <ProductNote
+              title="How this page fits"
+              body="Backplanes are the highest-level execution surfaces. Hosts attach concrete launch targets, and sessions inherit them at run time."
+            />
+          }
+        >
+          <ConfigBlock
+            title="Backplanes"
+            description="Execution fabrics available to new sessions."
+            actionLabel="Add backplane"
+            onAdd={() =>
+              updateConfigDraft((current) => ({
+                ...current,
+                backplanes: [...current.backplanes, createBackplaneDefinition()],
+              }))
+            }
+          >
+            {configDraft.backplanes.map((backplane, index) => (
+              <BackplaneEditor
+                key={backplane.id}
+                backplane={backplane}
+                onChange={(nextValue) =>
+                  updateConfigDraft((current) => ({
+                    ...current,
+                    backplanes: updateItem(current.backplanes, index, nextValue),
+                  }))
+                }
+                onRemove={() =>
+                  updateConfigDraft((current) => ({
+                    ...current,
+                    backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
+                  }))
+                }
+              />
+            ))}
+          </ConfigBlock>
+        </InventoryPage>
+      )
+      break
+    case 'hosts':
+      currentPage = (
+        <InventoryPage
+          eyebrow="Host inventory"
+          title="Launch hosts"
+          description="Map each backplane to concrete local or container targets with the right shell and working-directory defaults."
+          metrics={[
+            inventoryMetrics[1],
+            {
+              label: 'Docker-ready hosts',
+              value: savedConfig.hosts.filter((host) => Boolean(host.dockerImage)).length,
+              detail: 'Hosts that already declare a container image.',
+            },
+            {
+              label: 'Working dirs',
+              value: savedConfig.hosts.filter((host) => Boolean(host.workingDirectory)).length,
+              detail: 'Hosts pinned to a preferred execution directory.',
+            },
+          ]}
+          aside={
+            <ProductNote
+              title="Launch guidance"
+              body="Hosts are the most concrete runtime targets in the product. They should stay obvious, auditable, and connector-agnostic."
+            />
+          }
+        >
+          <ConfigBlock
+            title="Hosts"
+            description="Concrete local or container targets exposed by each backplane."
+            actionLabel="Add host"
+            onAdd={() =>
+              updateConfigDraft((current) => ({
+                ...current,
+                hosts: [
+                  ...current.hosts,
+                  createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
+                ],
+              }))
+            }
+          >
+            {configDraft.hosts.map((host, index) => (
+              <HostEditor
+                key={host.id}
+                host={host}
+                backplanes={configDraft.backplanes}
+                onChange={(nextValue) =>
+                  updateConfigDraft((current) => ({
+                    ...current,
+                    hosts: updateItem(current.hosts, index, nextValue),
+                  }))
+                }
+                onRemove={() =>
+                  updateConfigDraft((current) => ({
+                    ...current,
+                    hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
+                  }))
+                }
+              />
+            ))}
+          </ConfigBlock>
+        </InventoryPage>
+      )
+      break
+    case 'connectors':
+      currentPage = (
+        <InventoryPage
+          eyebrow="Connector catalog"
+          title="Connector definitions"
+          description="Configure shell and agent launch defaults, model hints, and permission envelopes for each runtime connector."
+          metrics={[
+            inventoryMetrics[2],
+            {
+              label: 'Model-aware',
+              value: savedConfig.connectors.filter((connector) => connector.defaultModel).length,
+              detail: 'Connectors with a model default ready for launch.',
+            },
+            {
+              label: 'Policy-aware',
+              value: savedConfig.connectors.filter((connector) => connector.defaultPermissionMode || connector.skipPermissions).length,
+              detail: 'Connectors with explicit permission posture.',
+            },
+          ]}
+          aside={
+            <ProductNote
+              title="Connector policy"
+              body="Connectors direct operators into the right CLI immediately. Defaults here should make launch intent obvious before any session starts."
+            />
+          }
+        >
+          <ConfigBlock
+            title="Connectors"
+            description="CLI adapters mapped into each session."
+            actionLabel="Add connector"
+            onAdd={() =>
+              updateConfigDraft((current) => ({
+                ...current,
+                connectors: [...current.connectors, createConnectorDefinition()],
+              }))
+            }
+          >
+            {configDraft.connectors.map((connector, index) => (
+              <ConnectorEditor
+                key={connector.id}
+                connector={connector}
+                onChange={(nextValue) =>
+                  updateConfigDraft((current) => ({
+                    ...current,
+                    connectors: updateItem(current.connectors, index, nextValue),
+                  }))
+                }
+                onRemove={() =>
+                  updateConfigDraft((current) => ({
+                    ...current,
+                    connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
+                  }))
+                }
+              />
+            ))}
+          </ConfigBlock>
+        </InventoryPage>
+      )
+      break
+    case 'lab':
+      currentPage = (
+        <BlueprintPage
+          eyebrow="Experiment lab"
+          title="Run structured experiments"
+          description="Turn the studio into a repeatable validation surface: compare outputs, rehearse workflows, and capture evidence."
+          cards={labBlueprints}
+          metrics={[
+            { label: 'Recipes', value: labBlueprints.length, detail: 'Experiment templates ready to implement.' },
+            { label: 'Available connectors', value: enabledConnectors.length, detail: 'Candidate runtimes for experiment matrices.' },
+            { label: 'Recent sessions', value: sessions.length, detail: 'Live material already flowing through the lab.' },
+          ]}
+          quickLinks={[
+            { href: createStudioSectionHref('workspace'), label: 'Open workspace' },
+            { href: createStudioSectionHref('connectors'), label: 'Tune connectors' },
+          ]}
+        />
+      )
+      break
+    case 'agents':
+      currentPage = (
+        <BlueprintPage
+          eyebrow="Agent definitions"
+          title="Local Claude agent catalog"
+          description={
+            claudeAgentCount > 0
+              ? 'These agent slugs are loaded on demand from the local Claude home so the studio reflects the real operator catalog without shipping raw file contents.'
+              : 'No local Claude agents were discovered, so the page falls back to suggested starter roles for the studio.'
+          }
+          cards={agentCards}
+          metrics={[
+            {
+              label: 'Discovered agents',
+              value: claudeAgentCount || agentBlueprints.length,
+              detail: claudeAgentCount > 0 ? 'Loaded from ~/.claude via a sanitized catalog endpoint.' : 'Suggested starter roles for the studio.',
+            },
+            { label: 'Connectors', value: enabledConnectors.length, detail: 'Potential agent entrypoints already in runtime config.' },
+            { label: 'Policy drafts', value: savedConfig.connectors.filter((connector) => connector.skipPermissions).length, detail: 'Connectors currently bypassing standard permission prompts.' },
+          ]}
+          quickLinks={[
+            { href: createStudioSectionHref('skills'), label: 'Review skills' },
+            { href: createStudioSectionHref('settings'), label: 'Open settings' },
+          ]}
+        />
+      )
+      break
+    case 'skills':
+      currentPage = (
+        <BlueprintPage
+          eyebrow="Skill definitions"
+          title="Local Claude skill catalog"
+          description={
+            claudeSkillCount > 0
+              ? 'Reusable skill slugs are discovered from the local Claude home, including bundled command counts, without exposing file paths or frontmatter copy.'
+              : 'No local Claude skills were discovered, so the page shows product-oriented starter concepts instead.'
+          }
+          cards={skillCards}
+          metrics={[
+            {
+              label: 'Discovered skills',
+              value: claudeSkillCount || skillBlueprints.length,
+              detail: claudeSkillCount > 0 ? `${claudeCommandCount} custom commands found under ~/.claude.` : 'Starter bundles for recovery, tuning, and governance.',
+            },
+            { label: 'Tool-aware connectors', value: savedConfig.connectors.filter((connector) => connector.allowedTools.length > 0).length, detail: 'Connectors that already encode tool policy.' },
+            { label: 'Save state', value: configDirty ? 'Unsaved edits' : 'In sync', detail: 'Definition scaffolds should track config discipline too.' },
+          ]}
+          quickLinks={[
+            { href: createStudioSectionHref('agents'), label: 'Open agents' },
+            { href: createStudioSectionHref('workspace'), label: 'Open workspace' },
+          ]}
+        />
+      )
+      break
+    case 'mcp':
+      currentPage = (
+        <BlueprintPage
+          eyebrow="MCP registry"
+          title="Claude MCP and plugin surfaces"
+          description={
+            claudeMcpArtifactCount > 0 || (claudeSettings?.enabledPluginCount ?? 0) > 0
+              ? 'This view surfaces count-based MCP and plugin signals from the local Claude home without exposing private names or command strings.'
+              : 'No MCP-specific local artifacts were discovered yet, so the page keeps the broader rollout blueprint visible.'
+          }
+          cards={mcpCards}
+          metrics={[
+            {
+              label: 'Artifacts',
+              value: claudeMcpArtifactCount || mcpBlueprints.length,
+              detail: claudeMcpArtifactCount > 0 ? 'Top-level MCP-related artifacts discovered in ~/.claude.' : 'Starter surfaces for the first MCP rollout.',
+            },
+            {
+              label: 'Enabled plugins',
+              value: claudeSettings?.enabledPluginCount ?? 0,
+              detail: 'Enabled plugin state is summarized from local Claude settings.',
+            },
+            { label: 'Operational anchors', value: sessions.length + enabledConnectors.length, detail: 'Existing studio surfaces MCP can amplify.' },
+            { label: 'Status', value: claudeHome?.exists ? 'Connected' : 'Scaffold', detail: 'This page is ready for persistence and live health checks next.' },
+          ]}
+          quickLinks={[
+            { href: createStudioSectionHref('overview'), label: 'Back to overview' },
+            { href: createStudioSectionHref('settings'), label: 'Review settings' },
+          ]}
+        />
+      )
+      break
+    case 'settings':
+      currentPage = (
+        <SettingsPage
+          claudeHome={claudeHome}
+          compactWorkspace={compactWorkspace}
+          config={savedConfig}
+          configDirty={configDirty}
+          inventoryMetrics={inventoryMetrics}
+          sessionMetrics={sessionMetrics}
+          themeMode={themeMode}
+        />
+      )
+      break
+    case 'overview':
+    default:
+      currentPage = (
+        <OverviewPage
+          claudeHome={claudeHome}
+          compactWorkspace={compactWorkspace}
+          config={savedConfig}
+          inventoryMetrics={inventoryMetrics}
+          onOpenSection={openStudioSection}
+          onOpenSession={handleOpenWorkspaceSession}
+          sessionMetrics={sessionMetrics}
+          sessions={sessions}
+          statusMessage={statusMessage}
+          workspace={workspace}
+        />
+      )
+      break
+  }
+
   return (
     <>
       <a href="#main-content" className="skip-link">
-        Skip to terminal
+        Skip to main content
       </a>
-      <div className="app-shell">
-        <header className="masthead">
-          <div className="masthead__brand">
-            <p className="eyebrow">Browser terminal cockpit</p>
-            <div className="masthead__title">
-              <h1>ClankYankers</h1>
-              <p className="masthead__lede">Local shell and agent runtime control deck.</p>
-            </div>
+      <div className="studio-shell">
+        <aside className="studio-sidebar">
+          <div className="studio-sidebar__brand">
+            <p className="eyebrow">Local orchestration studio</p>
+            <h1>ClankYankers</h1>
+            <p>
+              A product shell for sessions, runtimes, definitions, and experiments built around a real terminal workspace.
+            </p>
           </div>
-          <div className="masthead__meta">
-            <div className="masthead__status">
-              <div className="status-chip">
-                <span className="status-chip__label">Deck status</span>
-                <strong title={statusMessage}>{statusMessage}</strong>
+
+          <div className="studio-sidebar__metrics">
+            <MetricStrip items={sessionMetrics.slice(0, 2)} />
+          </div>
+
+          <nav aria-label="Product sections" className="studio-nav">
+            {studioNavigation.map((group) => (
+              <div className="studio-nav__group" key={group.title}>
+                <p className="studio-nav__label">{group.title}</p>
+                <div className="studio-nav__items">
+                  {group.items.map((section) => (
+                    <a
+                      key={section}
+                      className={`studio-nav__item${section === activeSection ? ' is-active' : ''}`}
+                      data-testid={`nav-section-${section}`}
+                      href={createStudioSectionHref(section)}
+                      aria-current={section === activeSection ? 'page' : undefined}
+                    >
+                      <span>{studioSectionMeta[section].label}</span>
+                      <strong>{sectionBadges[section]}</strong>
+                    </a>
+                  ))}
+                </div>
               </div>
-              <div className="status-chip">
-                <span className="status-chip__label">Live sessions</span>
-                <strong>{sessions.length}</strong>
-              </div>
-              <div className="status-chip">
-                <span className="status-chip__label">Workspace</span>
-                <strong>{formatWorkspaceLayout(workspace.layout)}</strong>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="studio-main">
+          <header className="masthead masthead--studio">
+            <div className="masthead__brand">
+              <p className="eyebrow">{activeSectionMeta.eyebrow}</p>
+              <div className="masthead__title">
+                <h2>{activeSectionMeta.label}</h2>
+                <p className="masthead__lede">{activeSectionMeta.description}</p>
               </div>
             </div>
-            <div className="header-actions">
+            <div className="masthead__meta">
+              <div className="masthead__status">
+                <div className="status-chip">
+                  <span className="status-chip__label">Deck status</span>
+                  <strong title={statusMessage}>{summarizeStatusMessage(statusMessage)}</strong>
+                </div>
+                <div className="status-chip">
+                  <span className="status-chip__label">Live sessions</span>
+                  <strong>{sessions.length}</strong>
+                </div>
+                <div className="status-chip">
+                  <span className="status-chip__label">Workspace</span>
+                  <strong>{formatWorkspaceLayout(workspace.layout)}</strong>
+                </div>
+              </div>
+              <div className="header-actions">
               <button
                 className="button button--ghost"
                 data-testid="refresh-sessions"
-                onClick={() => void refreshSessions()}
+                onClick={() => void handleRefreshAction()}
                 type="button"
               >
-                {isRefreshing ? 'Refreshing…' : 'Refresh sessions'}
+                {isRefreshing ? 'Refreshing…' : refreshActionLabel}
               </button>
-              <button
-                className="button button--ghost"
-                data-testid="discard-config"
-                onClick={handleResetDraft}
-                disabled={!configDirty}
-                type="button"
-              >
-                Discard edits
-              </button>
-              <button
-                className="button button--solid"
-                data-testid="save-config"
-                onClick={handleSaveConfig}
-                disabled={isSavingConfig || !configDirty}
-                type="button"
-              >
-                {isSavingConfig ? 'Saving…' : 'Save config'}
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {errorMessage ? (
-          <div className="alert" role="alert">
-            <strong>Heads up:</strong> {errorMessage}
-          </div>
-        ) : null}
-
-        <main className={`workspace${activeSession ? ' workspace--active' : ''}`}>
-          <aside className="rail">
-            <section className="panel panel--launch">
-              <div className="panel__header">
-                <div>
-                  <p className="eyebrow">Session launch</p>
-                  <h2>New session</h2>
-                </div>
-              </div>
-
-              <form className="launch-form" data-testid="launch-form" onSubmit={handleLaunchSession}>
-                <label className="field">
-                  <span>Backplane</span>
-                  <select
-                    data-testid="launch-backplane"
-                    value={launchDraft.backplaneId}
-                    onChange={(event) => updateLaunchDraft('backplaneId', event.target.value)}
-                  >
-                    {enabledBackplanes.map((backplane) => (
-                      <option key={backplane.id} value={backplane.id}>
-                        {backplane.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>Host</span>
-                  <select
-                    data-testid="launch-host"
-                    value={launchDraft.hostId}
-                    onChange={(event) => updateLaunchDraft('hostId', event.target.value)}
-                  >
-                    {availableHosts.map((host) => (
-                      <option key={host.id} value={host.id}>
-                        {host.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>Connector</span>
-                  <select
-                    data-testid="launch-connector"
-                    value={launchDraft.connectorId}
-                    onChange={(event) => updateLaunchDraft('connectorId', event.target.value)}
-                  >
-                    {enabledConnectors.map((connector) => (
-                      <option key={connector.id} value={connector.id}>
-                        {connector.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {selectedConnector ? (
+                {showConfigActions ? (
                   <>
-                    <div className="field field--hint">
-                      <span>Launch target</span>
-                      <p data-testid="launch-connector-command">
-                        {formatConnectorLaunchTarget(selectedConnector)}
-                      </p>
-                    </div>
-
-                    {selectedConnector.kind.toLowerCase() !== 'shell' ? (
-                      <div className="launch-overrides" data-testid="launch-overrides">
-                        <label className="field">
-                          <span>Model override</span>
-                          <input
-                            data-testid="launch-model"
-                            placeholder={selectedConnector.defaultModel ?? 'Use connector default'}
-                            value={launchDraft.model ?? ''}
-                            onChange={(event) => updateLaunchDraft('model', event.target.value.trim() || null)}
-                          />
-                        </label>
-                      </div>
-                    ) : (
-                      <p className="field-note">
-                        Uses the selected host shell.
-                      </p>
-                    )}
-                  </>
-                ) : null}
-
-                <div className="dimension-grid">
-                  <label className="field">
-                    <span>Columns</span>
-                    <input
-                      data-testid="launch-cols"
-                      type="number"
-                      min={24}
-                      max={240}
-                      value={launchDraft.cols}
-                      onChange={(event) => updateLaunchDraft('cols', Number(event.target.value))}
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span>Rows</span>
-                    <input
-                      data-testid="launch-rows"
-                      type="number"
-                      min={24}
-                      max={240}
-                      value={launchDraft.rows}
-                      onChange={(event) => updateLaunchDraft('rows', Number(event.target.value))}
-                    />
-                  </label>
-                </div>
-
-                <button className="button button--solid launch-button" data-testid="launch-session" disabled={isCreatingSession}>
-                  {isCreatingSession ? 'Launching…' : 'Launch session'}
-                </button>
-              </form>
-              <datalist id="permission-mode-options">
-                {permissionModes.map((mode) => (
-                  <option key={mode} value={mode} />
-                ))}
-              </datalist>
-            </section>
-
-            <details className="panel panel--settings" data-testid="config-panel">
-              <summary data-testid="config-panel-toggle">
-                <div>
-                  <p className="eyebrow">Configuration manifest</p>
-                  <h2>Runtime config</h2>
-                </div>
-              </summary>
-              <div className="panel--settings__body">
-                <ConfigBlock
-                  title="Backplanes"
-                  description="Execution fabrics available to new sessions."
-                  actionLabel="Add backplane"
-                  onAdd={() =>
-                    updateConfigDraft((current) => ({
-                      ...current,
-                      backplanes: [...current.backplanes, createBackplaneDefinition()],
-                    }))
-                  }
-                >
-                  {configDraft.backplanes.map((backplane, index) => (
-                    <BackplaneEditor
-                      key={backplane.id}
-                      backplane={backplane}
-                      onChange={(nextValue) =>
-                        updateConfigDraft((current) => ({
-                          ...current,
-                          backplanes: updateItem(current.backplanes, index, nextValue),
-                        }))
-                      }
-                      onRemove={() =>
-                        updateConfigDraft((current) => ({
-                          ...current,
-                          backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
-                        }))
-                      }
-                    />
-                  ))}
-                </ConfigBlock>
-
-                <ConfigBlock
-                  title="Hosts"
-                  description="Concrete local or container targets exposed by each backplane."
-                  actionLabel="Add host"
-                  onAdd={() =>
-                    updateConfigDraft((current) => ({
-                      ...current,
-                      hosts: [
-                        ...current.hosts,
-                        createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
-                      ],
-                    }))
-                  }
-                >
-                  {configDraft.hosts.map((host, index) => (
-                    <HostEditor
-                      key={host.id}
-                      host={host}
-                      backplanes={configDraft.backplanes}
-                      onChange={(nextValue) =>
-                        updateConfigDraft((current) => ({
-                          ...current,
-                          hosts: updateItem(current.hosts, index, nextValue),
-                        }))
-                      }
-                      onRemove={() =>
-                        updateConfigDraft((current) => ({
-                          ...current,
-                          hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
-                        }))
-                      }
-                    />
-                  ))}
-                </ConfigBlock>
-
-                <ConfigBlock
-                  title="Connectors"
-                  description="CLI adapters mapped into each session."
-                  actionLabel="Add connector"
-                  onAdd={() =>
-                    updateConfigDraft((current) => ({
-                      ...current,
-                      connectors: [...current.connectors, createConnectorDefinition()],
-                    }))
-                  }
-                >
-                  {configDraft.connectors.map((connector, index) => (
-                    <ConnectorEditor
-                      key={connector.id}
-                      connector={connector}
-                      onChange={(nextValue) =>
-                        updateConfigDraft((current) => ({
-                          ...current,
-                          connectors: updateItem(current.connectors, index, nextValue),
-                        }))
-                      }
-                      onRemove={() =>
-                        updateConfigDraft((current) => ({
-                          ...current,
-                          connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
-                        }))
-                      }
-                    />
-                  ))}
-                </ConfigBlock>
-              </div>
-            </details>
-
-            <section className="panel panel--manifest">
-              <div className="panel__header">
-                <div>
-                  <p className="eyebrow">Session manifest</p>
-                  <h2>Sessions</h2>
-                </div>
-              </div>
-
-              {sessions.length > 0 ? (
-                <div className="session-list" role="tablist" aria-label="Sessions">
-                  {sessions.map((session) => (
                     <button
-                      key={session.id}
-                      data-testid={`session-card-${session.id}`}
-                      className={`session-card${activeSession?.id === session.id ? ' is-active' : ''}`}
-                      onClick={() => handleOpenSession(session)}
-                      role="tab"
-                      aria-selected={activeSession?.id === session.id}
+                      className="button button--ghost"
+                      data-testid="discard-config"
+                      onClick={handleResetDraft}
+                      disabled={!configDirty}
                       type="button"
                     >
-                      <span className={`session-state session-state--${session.state.toLowerCase()}`}>
-                        {session.state}
-                      </span>
-                      <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
-                      <span>{session.displayCommand}</span>
+                      Discard edits
                     </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-callout">
-                  <p className="eyebrow">No live sessions yet</p>
-                  <p>
-                    Launch a shell or Ollama run, then switch tabs freely. Sessions survive WebSocket
-                    disconnects and reattach when you come back.
-                  </p>
-                </div>
+                    <button
+                      className="button button--solid"
+                      data-testid="save-config"
+                      onClick={handleSaveConfig}
+                      disabled={isSavingConfig || !configDirty}
+                      type="button"
+                    >
+                      {isSavingConfig ? 'Saving…' : 'Save config'}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </header>
+
+          {errorMessage ? (
+            <div className="alert" role="alert">
+              <strong>Heads up:</strong> {errorMessage}
+            </div>
+          ) : null}
+
+          <main className="product-main" id="main-content">
+            {currentPage}
+          </main>
+        </div>
+      </div>
+      <datalist id="permission-mode-options">
+        {permissionModes.map((mode) => (
+          <option key={mode} value={mode} />
+        ))}
+      </datalist>
+    </>
+  )
+}
+
+function MetricStrip({ items }: { items: MetricItem[] }) {
+  return (
+    <div className="metric-strip">
+      {items.map((item) => (
+        <article className="metric-tile" key={item.label}>
+          <span className="metric-tile__label">{item.label}</span>
+          <strong>{item.value}</strong>
+          {item.detail ? <p>{item.detail}</p> : null}
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function ProductNote({ body, title }: { body: string; title: string }) {
+  return (
+    <section className="panel product-note">
+      <div className="panel__header">
+        <div>
+          <p className="eyebrow">Operator note</p>
+          <h2>{title}</h2>
+        </div>
+      </div>
+      <p>{body}</p>
+    </section>
+  )
+}
+
+interface OverviewPageProps {
+  claudeHome: ClaudeHomeSummary | null
+  compactWorkspace: boolean
+  config: AppConfig
+  inventoryMetrics: MetricItem[]
+  onOpenSection: (section: StudioSection) => void
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  sessionMetrics: MetricItem[]
+  sessions: SessionSummary[]
+  statusMessage: string
+  workspace: { layout: WorkspaceLayout }
+}
+
+function OverviewPage({
+  claudeHome,
+  compactWorkspace,
+  config,
+  inventoryMetrics,
+  onOpenSection,
+  onOpenSession,
+  sessionMetrics,
+  sessions,
+  statusMessage,
+  workspace,
+}: OverviewPageProps) {
+  const latestSessions = sessions.slice(0, 4)
+
+  return (
+    <div className="product-page product-page--overview" data-testid="product-page-overview">
+      <section className="page-stack">
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">Studio snapshot</p>
+            <h2>One shell, multiple operating surfaces</h2>
+            <p>
+              The terminal is now one part of a broader product: runtime inventory, configuration, experiments,
+              and future definitions all live beside it.
+            </p>
+          </div>
+          <div className="inline-actions">
+            <button className="button button--solid" onClick={() => onOpenSection('workspace')} type="button">
+              Open workspace
+            </button>
+            <button className="button button--ghost" onClick={() => onOpenSection('sessions')} type="button">
+              Review sessions
+            </button>
+          </div>
+        </div>
+
+        <MetricStrip items={[...sessionMetrics, ...inventoryMetrics]} />
+
+        <div className="overview-grid">
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Operational pulse</p>
+                <h2>What matters right now</h2>
+              </div>
+            </div>
+            <div className="summary-list">
+              <article>
+                <span>Deck status</span>
+                <strong title={statusMessage}>{statusMessage}</strong>
+              </article>
+              <article>
+                <span>Workspace shape</span>
+                <strong>{formatWorkspaceLayout(workspace.layout)}</strong>
+              </article>
+              <article>
+                <span>Runtime policy</span>
+                <strong>{config.connectors.some((connector) => connector.skipPermissions) ? 'Needs review' : 'Standardized'}</strong>
+              </article>
+              <article>
+                <span>Claude home</span>
+                <strong>
+                  {claudeHome?.exists
+                    ? `${claudeHome.agentCount} agents / ${claudeHome.skillCount} skills`
+                    : 'Not detected'}
+                </strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Product surfaces</p>
+                <h2>Jump directly into the right tool</h2>
+              </div>
+            </div>
+            <div className="quick-links">
+              {(['backplanes', 'hosts', 'connectors', 'lab', 'agents', 'skills', 'mcp', 'settings'] as StudioSection[]).map(
+                (section) => (
+                  <button
+                    key={section}
+                    className="quick-link"
+                    onClick={() => onOpenSection(section)}
+                    type="button"
+                  >
+                    <span className="quick-link__eyebrow">{studioSectionMeta[section].eyebrow}</span>
+                    <strong>{studioSectionMeta[section].label}</strong>
+                    <p>{studioSectionMeta[section].description}</p>
+                  </button>
+                ),
               )}
-            </section>
+            </div>
+          </section>
+
+          <section className="panel overview-grid__wide">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Recent session fleet</p>
+                <h2>Recover context fast</h2>
+              </div>
+            </div>
+            {latestSessions.length > 0 ? (
+              <div className="overview-session-list">
+                {latestSessions.map((session) => (
+                  <article className="overview-session-item" key={session.id}>
+                    <div>
+                      <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
+                      <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
+                      <p>{session.displayCommand}</p>
+                    </div>
+                    <div className="inline-actions">
+                      <button className="button button--ghost" onClick={() => onOpenSession(session)} type="button">
+                        Open
+                      </button>
+                      <button
+                        className="button button--ghost"
+                        onClick={() => onOpenSession(session, 'secondary')}
+                        type="button"
+                        disabled={compactWorkspace}
+                        title={compactWorkspace ? 'Compare is unavailable on compact viewports.' : undefined}
+                      >
+                        Compare
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-callout">
+                <p className="eyebrow">No live sessions yet</p>
+                <p>Start in Workspace to launch the first terminal, then this overview becomes your operating pulse.</p>
+              </div>
+            )}
+          </section>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+interface WorkspacePageProps {
+  activeSession: SessionSummary | null
+  activeTab: WorkspaceTab | null
+  availableHosts: HostConfig[]
+  canSplitWorkspace: boolean
+  compactWorkspace: boolean
+  configDraft: AppConfig
+  enabledBackplanes: BackplaneDefinition[]
+  enabledConnectors: ConnectorDefinition[]
+  isCreatingSession: boolean
+  isSavingConfig: boolean
+  isStoppingSession: boolean
+  launchDraft: LaunchDraft
+  onCloseWorkspaceTab: (tabId: string) => void
+  onLaunchSession: (event: FormEvent<HTMLFormElement>) => void
+  onOpenOrchestration: () => void
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  onResetDraft: () => void
+  onSaveConfig: () => void
+  onSelectPaneTab: (target: 'primary' | 'secondary', tabId: string) => void
+  onSessionMessage: (sessionId: string, message: TerminalServerMessage) => void
+  onSetWorkspaceLayout: (layout: WorkspaceLayout) => void
+  onStopSession: (sessionId: string) => void
+  onUpdateConfigDraft: (updater: (current: AppConfig) => AppConfig) => void
+  onUpdateLaunchDraft: <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) => void
+  savedConfig: AppConfig
+  secondarySession: SessionSummary | null
+  secondaryTab: WorkspaceTab | null
+  selectedConnector: ConnectorDefinition | null
+  sessionMetrics: MetricItem[]
+  sessions: SessionSummary[]
+  themeMode: ThemeMode
+  workspace: {
+    activeTabId: string
+    layout: WorkspaceLayout
+    tabs: WorkspaceTab[]
+  }
+  workspaceTabOptions: Array<{ label: string; tabId: string }>
+}
+
+function WorkspacePage({
+  activeSession,
+  activeTab,
+  availableHosts,
+  canSplitWorkspace,
+  compactWorkspace,
+  configDraft,
+  enabledBackplanes,
+  enabledConnectors,
+  isCreatingSession,
+  isSavingConfig,
+  isStoppingSession,
+  launchDraft,
+  onCloseWorkspaceTab,
+  onLaunchSession,
+  onOpenOrchestration,
+  onOpenSession,
+  onResetDraft,
+  onSaveConfig,
+  onSelectPaneTab,
+  onSessionMessage,
+  onSetWorkspaceLayout,
+  onStopSession,
+  onUpdateConfigDraft,
+  onUpdateLaunchDraft,
+  secondarySession,
+  secondaryTab,
+  selectedConnector,
+  sessionMetrics,
+  sessions,
+  themeMode,
+  workspace,
+  workspaceTabOptions,
+}: WorkspacePageProps) {
+  return (
+    <div className="product-page product-page--workspace" data-testid="product-page-workspace">
+      <section className="page-stack">
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">Command studio</p>
+            <h2>Terminal work stays first-class</h2>
+            <p>
+              Launch, compare, and monitor terminals here while the rest of the product grows around it.
+            </p>
+          </div>
+          <MetricStrip items={sessionMetrics} />
+        </div>
+
+        <div className={`workspace workspace--product${activeSession ? ' workspace--active' : ''}`}>
+          <aside className="rail">
+            <LaunchPanel
+              availableHosts={availableHosts}
+              enabledBackplanes={enabledBackplanes}
+              enabledConnectors={enabledConnectors}
+              isCreatingSession={isCreatingSession}
+              launchDraft={launchDraft}
+              onLaunchSession={onLaunchSession}
+              onUpdateLaunchDraft={onUpdateLaunchDraft}
+              selectedConnector={selectedConnector}
+            />
+
+            <QuickConfigPanel
+              configDraft={configDraft}
+              isSavingConfig={isSavingConfig}
+              onAddBackplane={() =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  backplanes: [...current.backplanes, createBackplaneDefinition()],
+                }))
+              }
+              onAddConnector={() =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  connectors: [...current.connectors, createConnectorDefinition()],
+                }))
+              }
+              onAddHost={() =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  hosts: [
+                    ...current.hosts,
+                    createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
+                  ],
+                }))
+              }
+              onBackplaneChange={(index, nextValue) =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  backplanes: updateItem(current.backplanes, index, nextValue),
+                }))
+              }
+              onBackplaneRemove={(index) =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
+                }))
+              }
+              onConnectorChange={(index, nextValue) =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  connectors: updateItem(current.connectors, index, nextValue),
+                }))
+              }
+              onConnectorRemove={(index) =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
+                }))
+              }
+              onHostChange={(index, nextValue) =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  hosts: updateItem(current.hosts, index, nextValue),
+                }))
+              }
+              onHostRemove={(index) =>
+                onUpdateConfigDraft((current) => ({
+                  ...current,
+                  hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
+                }))
+              }
+              onResetDraft={onResetDraft}
+              onSaveConfig={onSaveConfig}
+            />
+
+            <SessionManifestPanel
+              activeSessionId={activeSession?.id ?? null}
+              onOpenSession={onOpenSession}
+              sessions={sessions}
+            />
           </aside>
 
-          <section className={`stage${activeSession ? ' stage--active' : ' stage--idle'}`} id="main-content">
+          <section className={`stage${activeSession ? ' stage--active' : ' stage--idle'}`}>
             <div className="stage__header">
               <div>
-                <p className="eyebrow">Command studio</p>
-                <h2>Workspace</h2>
+                <p className="eyebrow">Workspace canvas</p>
+                <h2>Session stage</h2>
                 <p className="stage__lede">
-                  Tabs manage long-lived sessions, while split panes handle compare and monitor flows
-                  without breaking terminal fidelity.
+                  Tabs manage long-lived sessions, while split panes handle compare and monitor flows without breaking terminal fidelity.
                 </p>
                 <p className="stage__context">
                   Active: {formatWorkspaceLabel(activeTab?.title ?? 'Orchestration')}
@@ -752,13 +1596,13 @@ function App() {
               </div>
 
               <div className="stage__actions">
-                <button className="button button--ghost" onClick={handleOpenOrchestration} type="button">
+                <button className="button button--ghost" onClick={onOpenOrchestration} type="button">
                   Orchestration
                 </button>
                 <button
                   className="button button--ghost"
                   data-testid="split-vertical"
-                  onClick={() => handleSetWorkspaceLayout('split-vertical')}
+                  onClick={() => onSetWorkspaceLayout('split-vertical')}
                   disabled={!canSplitWorkspace}
                   type="button"
                   title={compactWorkspace ? 'Compare panes are available on larger viewports.' : undefined}
@@ -768,7 +1612,7 @@ function App() {
                 <button
                   className="button button--ghost"
                   data-testid="split-horizontal"
-                  onClick={() => handleSetWorkspaceLayout('split-horizontal')}
+                  onClick={() => onSetWorkspaceLayout('split-horizontal')}
                   disabled={!canSplitWorkspace}
                   type="button"
                   title={compactWorkspace ? 'Compare panes are available on larger viewports.' : undefined}
@@ -778,7 +1622,7 @@ function App() {
                 <button
                   className="button button--ghost"
                   data-testid="single-pane"
-                  onClick={() => handleSetWorkspaceLayout('single')}
+                  onClick={() => onSetWorkspaceLayout('single')}
                   disabled={workspace.layout === 'single'}
                   type="button"
                 >
@@ -797,7 +1641,7 @@ function App() {
                     <button
                       className="workspace-tab__trigger"
                       data-testid={`workspace-tab-${tab.id}`}
-                      onClick={() => setWorkspace((current) => focusWorkspaceTab(current, tab.id))}
+                      onClick={() => onSelectPaneTab('primary', tab.id)}
                       role="tab"
                       aria-selected={tab.id === workspace.activeTabId}
                       type="button"
@@ -805,15 +1649,13 @@ function App() {
                       <span className="workspace-tab__title" title={tab.title}>
                         {formatWorkspaceLabel(tab.title)}
                       </span>
-                      <span className="workspace-tab__kind">
-                        {tab.kind === 'orchestration' ? 'board' : 'session'}
-                      </span>
+                      <span className="workspace-tab__kind">{tab.kind === 'orchestration' ? 'board' : 'session'}</span>
                     </button>
                     {tab.closable ? (
                       <button
                         className="workspace-tab__close"
                         data-testid={`workspace-tab-close-${tab.id}`}
-                        onClick={() => handleCloseWorkspaceTab(tab.id)}
+                        onClick={() => onCloseWorkspaceTab(tab.id)}
                         aria-label={`Close ${tab.title}`}
                         type="button"
                       >
@@ -834,10 +1676,10 @@ function App() {
                   target="primary"
                   themeMode={themeMode}
                   isStoppingSession={isStoppingSession}
-                  onOpenSession={handleOpenSession}
-                  onSelectTab={handleSelectPaneTab}
-                  onSessionMessage={handleSessionMessage}
-                  onStopSession={handleStopSession}
+                  onOpenSession={onOpenSession}
+                  onSelectTab={onSelectPaneTab}
+                  onSessionMessage={onSessionMessage}
+                  onStopSession={onStopSession}
                   allowCompare={!compactWorkspace}
                 />
 
@@ -851,19 +1693,593 @@ function App() {
                     target="secondary"
                     themeMode={themeMode}
                     isStoppingSession={isStoppingSession}
-                    onOpenSession={handleOpenSession}
-                    onSelectTab={handleSelectPaneTab}
-                    onSessionMessage={handleSessionMessage}
-                    onStopSession={handleStopSession}
+                    onOpenSession={onOpenSession}
+                    onSelectTab={onSelectPaneTab}
+                    onSessionMessage={onSessionMessage}
+                    onStopSession={onStopSession}
                     allowCompare={!compactWorkspace}
                   />
                 ) : null}
               </div>
             </div>
           </section>
-        </main>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+interface LaunchPanelProps {
+  availableHosts: HostConfig[]
+  enabledBackplanes: BackplaneDefinition[]
+  enabledConnectors: ConnectorDefinition[]
+  isCreatingSession: boolean
+  launchDraft: LaunchDraft
+  onLaunchSession: (event: FormEvent<HTMLFormElement>) => void
+  onUpdateLaunchDraft: <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) => void
+  selectedConnector: ConnectorDefinition | null
+}
+
+function LaunchPanel({
+  availableHosts,
+  enabledBackplanes,
+  enabledConnectors,
+  isCreatingSession,
+  launchDraft,
+  onLaunchSession,
+  onUpdateLaunchDraft,
+  selectedConnector,
+}: LaunchPanelProps) {
+  return (
+    <section className="panel panel--launch">
+      <div className="panel__header">
+        <div>
+          <p className="eyebrow">Session launch</p>
+          <h2>New session</h2>
+        </div>
       </div>
-    </>
+
+      <form className="launch-form" data-testid="launch-form" onSubmit={onLaunchSession}>
+        <label className="field">
+          <span>Backplane</span>
+          <select
+            data-testid="launch-backplane"
+            value={launchDraft.backplaneId}
+            onChange={(event) => onUpdateLaunchDraft('backplaneId', event.target.value)}
+          >
+            {enabledBackplanes.map((backplane) => (
+              <option key={backplane.id} value={backplane.id}>
+                {backplane.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>Host</span>
+          <select
+            data-testid="launch-host"
+            value={launchDraft.hostId}
+            onChange={(event) => onUpdateLaunchDraft('hostId', event.target.value)}
+          >
+            {availableHosts.map((host) => (
+              <option key={host.id} value={host.id}>
+                {host.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>Connector</span>
+          <select
+            data-testid="launch-connector"
+            value={launchDraft.connectorId}
+            onChange={(event) => onUpdateLaunchDraft('connectorId', event.target.value)}
+          >
+            {enabledConnectors.map((connector) => (
+              <option key={connector.id} value={connector.id}>
+                {connector.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {selectedConnector ? (
+          <>
+            <div className="field field--hint">
+              <span>Launch target</span>
+              <p data-testid="launch-connector-command">{formatConnectorLaunchTarget(selectedConnector)}</p>
+            </div>
+
+            {selectedConnector.kind.toLowerCase() !== 'shell' ? (
+              <div className="launch-overrides" data-testid="launch-overrides">
+                <label className="field">
+                  <span>Model override</span>
+                  <input
+                    data-testid="launch-model"
+                    placeholder={selectedConnector.defaultModel ?? 'Use connector default'}
+                    value={launchDraft.model ?? ''}
+                    onChange={(event) => onUpdateLaunchDraft('model', event.target.value.trim() || null)}
+                  />
+                </label>
+              </div>
+            ) : (
+              <p className="field-note">Uses the selected host shell.</p>
+            )}
+          </>
+        ) : null}
+
+        <div className="dimension-grid">
+          <label className="field">
+            <span>Columns</span>
+            <input
+              data-testid="launch-cols"
+              type="number"
+              min={24}
+              max={240}
+              value={launchDraft.cols}
+              onChange={(event) => onUpdateLaunchDraft('cols', Number(event.target.value))}
+            />
+          </label>
+
+          <label className="field">
+            <span>Rows</span>
+            <input
+              data-testid="launch-rows"
+              type="number"
+              min={24}
+              max={240}
+              value={launchDraft.rows}
+              onChange={(event) => onUpdateLaunchDraft('rows', Number(event.target.value))}
+            />
+          </label>
+        </div>
+
+        <button className="button button--solid launch-button" data-testid="launch-session" disabled={isCreatingSession}>
+          {isCreatingSession ? 'Launching…' : 'Launch session'}
+        </button>
+      </form>
+    </section>
+  )
+}
+
+interface QuickConfigPanelProps {
+  configDraft: AppConfig
+  isSavingConfig: boolean
+  onAddBackplane: () => void
+  onAddConnector: () => void
+  onAddHost: () => void
+  onBackplaneChange: (index: number, nextValue: BackplaneDefinition) => void
+  onBackplaneRemove: (index: number) => void
+  onConnectorChange: (index: number, nextValue: ConnectorDefinition) => void
+  onConnectorRemove: (index: number) => void
+  onHostChange: (index: number, nextValue: HostConfig) => void
+  onHostRemove: (index: number) => void
+  onResetDraft: () => void
+  onSaveConfig: () => void
+}
+
+function QuickConfigPanel({
+  configDraft,
+  isSavingConfig,
+  onAddBackplane,
+  onAddConnector,
+  onAddHost,
+  onBackplaneChange,
+  onBackplaneRemove,
+  onConnectorChange,
+  onConnectorRemove,
+  onHostChange,
+  onHostRemove,
+  onResetDraft,
+  onSaveConfig,
+}: QuickConfigPanelProps) {
+  return (
+    <details className="panel panel--settings" data-testid="config-panel">
+      <summary data-testid="config-panel-toggle">
+        <div>
+          <p className="eyebrow">Configuration manifest</p>
+          <h2>Runtime config</h2>
+        </div>
+      </summary>
+      <div className="panel--settings__body">
+        <div className="inline-actions inline-actions--compact">
+          <button className="button button--ghost" onClick={onResetDraft} type="button">
+            Reset draft
+          </button>
+          <button className="button button--ghost" onClick={onSaveConfig} type="button">
+            {isSavingConfig ? 'Saving…' : 'Save from workspace'}
+          </button>
+        </div>
+        <ConfigBlock
+          title="Backplanes"
+          description="Execution fabrics available to new sessions."
+          actionLabel="Add backplane"
+          onAdd={onAddBackplane}
+        >
+          {configDraft.backplanes.map((backplane, index) => (
+            <BackplaneEditor
+              key={backplane.id}
+              backplane={backplane}
+              onChange={(nextValue) => onBackplaneChange(index, nextValue)}
+              onRemove={() => onBackplaneRemove(index)}
+            />
+          ))}
+        </ConfigBlock>
+
+        <ConfigBlock
+          title="Hosts"
+          description="Concrete local or container targets exposed by each backplane."
+          actionLabel="Add host"
+          onAdd={onAddHost}
+        >
+          {configDraft.hosts.map((host, index) => (
+            <HostEditor
+              key={host.id}
+              host={host}
+              backplanes={configDraft.backplanes}
+              onChange={(nextValue) => onHostChange(index, nextValue)}
+              onRemove={() => onHostRemove(index)}
+            />
+          ))}
+        </ConfigBlock>
+
+        <ConfigBlock
+          title="Connectors"
+          description="CLI adapters mapped into each session."
+          actionLabel="Add connector"
+          onAdd={onAddConnector}
+        >
+          {configDraft.connectors.map((connector, index) => (
+            <ConnectorEditor
+              key={connector.id}
+              connector={connector}
+              onChange={(nextValue) => onConnectorChange(index, nextValue)}
+              onRemove={() => onConnectorRemove(index)}
+            />
+          ))}
+        </ConfigBlock>
+      </div>
+    </details>
+  )
+}
+
+function SessionManifestPanel({
+  activeSessionId,
+  onOpenSession,
+  sessions,
+}: {
+  activeSessionId: string | null
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  sessions: SessionSummary[]
+}) {
+  return (
+    <section className="panel panel--manifest">
+      <div className="panel__header">
+        <div>
+          <p className="eyebrow">Session manifest</p>
+          <h2>Sessions</h2>
+        </div>
+      </div>
+
+      {sessions.length > 0 ? (
+        <div className="session-list" role="tablist" aria-label="Sessions">
+          {sessions.map((session) => (
+            <button
+              key={session.id}
+              data-testid={`session-card-${session.id}`}
+              className={`session-card${activeSessionId === session.id ? ' is-active' : ''}`}
+              onClick={() => onOpenSession(session)}
+              role="tab"
+              aria-selected={activeSessionId === session.id}
+              type="button"
+            >
+              <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
+              <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
+              <span>{session.displayCommand}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-callout">
+          <p className="eyebrow">No live sessions yet</p>
+          <p>
+            Launch a shell or Ollama run, then switch tabs freely. Sessions survive WebSocket disconnects and reattach when you come back.
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SessionsPage({
+  compactWorkspace,
+  onOpenSection,
+  onOpenSession,
+  sessionMetrics,
+  sessions,
+}: {
+  compactWorkspace: boolean
+  onOpenSection: (section: StudioSection) => void
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  sessionMetrics: MetricItem[]
+  sessions: SessionSummary[]
+}) {
+  return (
+    <div className="product-page product-page--sessions" data-testid="product-page-sessions">
+      <section className="page-stack">
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">Session fleet</p>
+            <h2>Browse the active runtime manifest</h2>
+            <p>Use this page as the operational ledger, then jump into Workspace only when you need the live terminal.</p>
+          </div>
+          <div className="inline-actions">
+            <button className="button button--solid" onClick={() => onOpenSection('workspace')} type="button">
+              Go to workspace
+            </button>
+          </div>
+        </div>
+        <MetricStrip items={sessionMetrics} />
+        {sessions.length > 0 ? (
+          <div className="catalog-grid">
+            {sessions.map((session) => (
+              <article className="catalog-card" key={session.id}>
+                <span className={`session-state session-state--${session.state.toLowerCase()}`}>{session.state}</span>
+                <strong title={session.id}>{formatWorkspaceLabel(session.id)}</strong>
+                <p>{session.displayCommand}</p>
+                <div className="summary-list summary-list--compact">
+                  <article>
+                    <span>Backplane</span>
+                    <strong>{session.backplaneId}</strong>
+                  </article>
+                  <article>
+                    <span>Host</span>
+                    <strong>{session.hostId}</strong>
+                  </article>
+                  <article>
+                    <span>Connector</span>
+                    <strong>{session.connectorId}</strong>
+                  </article>
+                </div>
+                <div className="inline-actions">
+                  <button className="button button--ghost" onClick={() => onOpenSession(session)} type="button">
+                    Open
+                  </button>
+                  <button
+                    className="button button--ghost"
+                    onClick={() => onOpenSession(session, 'secondary')}
+                    type="button"
+                    disabled={compactWorkspace}
+                    title={compactWorkspace ? 'Compare is unavailable on compact viewports.' : undefined}
+                  >
+                    Compare
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-stage">
+            <p className="eyebrow">No session fleet yet</p>
+            <h3>Launch the first runtime from Workspace.</h3>
+            <p>This page becomes your searchable manifest once live sessions exist.</p>
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+interface InventoryPageProps {
+  aside?: ReactNode
+  children: ReactNode
+  description: string
+  eyebrow: string
+  metrics: MetricItem[]
+  title: string
+}
+
+function InventoryPage({ aside, children, description, eyebrow, metrics, title }: InventoryPageProps) {
+  return (
+    <div className="product-page product-page--inventory">
+      <section className="page-stack">
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">{eyebrow}</p>
+            <h2>{title}</h2>
+            <p>{description}</p>
+          </div>
+        </div>
+        <MetricStrip items={metrics} />
+        <div className="inventory-grid">
+          <section className="inventory-grid__main">{children}</section>
+          <aside className="inventory-grid__aside">{aside}</aside>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function BlueprintPage({
+  cards,
+  description,
+  eyebrow,
+  metrics,
+  quickLinks,
+  title,
+}: {
+  cards: BlueprintCard[]
+  description: string
+  eyebrow: string
+  metrics: MetricItem[]
+  quickLinks: Array<{ href: string; label: string }>
+  title: string
+}) {
+  return (
+    <div className="product-page product-page--blueprint">
+      <section className="page-stack">
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">{eyebrow}</p>
+            <h2>{title}</h2>
+            <p>{description}</p>
+          </div>
+          <div className="inline-actions">
+            {quickLinks.map((link) => (
+              <a className="button button--ghost" href={link.href} key={link.href}>
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </div>
+        <MetricStrip items={metrics} />
+        <div className="catalog-grid">
+          {cards.map((card) => (
+            <article className="catalog-card" key={card.title}>
+              <span className="catalog-card__eyebrow">{card.eyebrow}</span>
+              <strong>{card.title}</strong>
+              <p>{card.description}</p>
+              <span className="catalog-card__badge">{card.badge}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function SettingsPage({
+  claudeHome,
+  compactWorkspace,
+  config,
+  configDirty,
+  inventoryMetrics,
+  sessionMetrics,
+  themeMode,
+}: {
+  claudeHome: ClaudeHomeSummary | null
+  compactWorkspace: boolean
+  config: AppConfig
+  configDirty: boolean
+  inventoryMetrics: MetricItem[]
+  sessionMetrics: MetricItem[]
+  themeMode: ThemeMode
+}) {
+  return (
+    <div className="product-page product-page--settings" data-testid="product-page-settings">
+      <section className="page-stack">
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">Control surfaces</p>
+            <h2>Studio settings and operating posture</h2>
+            <p>Use this page to understand how the local product behaves before deeper persistence arrives for every new surface.</p>
+          </div>
+        </div>
+        <MetricStrip
+          items={[
+            ...sessionMetrics.slice(0, 2),
+            ...inventoryMetrics.slice(0, 2),
+            {
+              label: 'Claude home',
+              value: claudeHome?.exists ? 'Connected' : 'Missing',
+              detail: claudeHome?.exists ? `${claudeHome.rootDisplayPath} is being summarized safely.` : 'No local Claude home was discovered.',
+            },
+            { label: 'Theme mode', value: themeMode, detail: 'Synchronized with system theme preference.' },
+          ]}
+        />
+        <div className="overview-grid">
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Visual behavior</p>
+                <h2>Viewport and theme</h2>
+              </div>
+            </div>
+            <div className="summary-list">
+              <article>
+                <span>Theme source</span>
+                <strong>System preference</strong>
+              </article>
+              <article>
+                <span>Current mode</span>
+                <strong>{themeMode}</strong>
+              </article>
+              <article>
+                <span>Compact workspace</span>
+                <strong>{compactWorkspace ? 'Enabled' : 'Disabled'}</strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Persistence</p>
+                <h2>Configuration state</h2>
+              </div>
+            </div>
+            <div className="summary-list">
+              <article>
+                <span>Config version</span>
+                <strong>{config.version}</strong>
+              </article>
+              <article>
+                <span>Draft state</span>
+                <strong>{configDirty ? 'Unsaved edits' : 'In sync'}</strong>
+              </article>
+              <article>
+                <span>Polling cadence</span>
+                <strong>5 seconds</strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Claude home</p>
+                <h2>Local integration status</h2>
+              </div>
+            </div>
+            <div className="summary-list">
+              <article>
+                <span>Catalog root</span>
+                <strong>{claudeHome?.rootDisplayPath ?? '~/.claude'}</strong>
+              </article>
+              <article>
+                <span>Agents / skills</span>
+                <strong>{claudeHome?.exists ? `${claudeHome.agentCount} / ${claudeHome.skillCount}` : 'Unavailable'}</strong>
+              </article>
+              <article>
+                <span>Enabled plugins</span>
+                <strong>{claudeHome?.settings?.enabledPluginCount ?? 0}</strong>
+              </article>
+              <article>
+                <span>Local overrides</span>
+                <strong>{claudeHome?.settings?.hasLocalOverrides ? 'Present' : 'None'}</strong>
+              </article>
+              <article>
+                <span>Permissions prompt</span>
+                <strong>
+                  {claudeHome?.settings?.skipDangerousModePermissionPrompt === true
+                    ? 'Skipped'
+                    : claudeHome?.settings?.skipDangerousModePermissionPrompt === false
+                      ? 'Enforced'
+                      : 'Unknown'}
+                </strong>
+              </article>
+            </div>
+          </section>
+
+          <ProductNote
+            title="What comes next"
+            body="The studio now reflects the local Claude home without exposing sensitive env values. This page is ready to expand into deeper user preferences, experiment defaults, audit retention, and global runtime policies next."
+          />
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -1476,6 +2892,89 @@ function readCompactWorkspace(): boolean {
   }
 
   return window.matchMedia(compactWorkspaceQuery).matches
+}
+
+function useStudioSection(): StudioSection {
+  const [section, setSection] = useState<StudioSection>(() => readStudioSection())
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (!window.location.hash) {
+      window.history.replaceState(null, '', createStudioSectionHref(defaultStudioSection))
+    }
+
+    const syncSection = () => {
+      setSection(readStudioSection())
+    }
+
+    window.addEventListener('hashchange', syncSection)
+    return () => {
+      window.removeEventListener('hashchange', syncSection)
+    }
+  }, [])
+
+  return section
+}
+
+function readStudioSection(): StudioSection {
+  if (typeof window === 'undefined') {
+    return defaultStudioSection
+  }
+
+  const hash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase()
+  const section = hash as StudioSection
+  return Object.hasOwn(studioSectionMeta, section) ? section : defaultStudioSection
+}
+
+function createStudioSectionHref(section: StudioSection): string {
+  return `#/${section}`
+}
+
+function setStudioSectionHash(section: StudioSection) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.location.hash = createStudioSectionHref(section)
+}
+
+function summarizeStatusMessage(message: string): string {
+  if (/synchronized/i.test(message)) {
+    return 'Synced'
+  }
+
+  if (/configuration saved/i.test(message)) {
+    return 'Config saved'
+  }
+
+  if (/configuration edits discarded/i.test(message)) {
+    return 'Draft reset'
+  }
+
+  if (/stop requested/i.test(message)) {
+    return 'Stopping'
+  }
+
+  if (/orchestration board/i.test(message)) {
+    return 'Board active'
+  }
+
+  if (/session .* is live/i.test(message)) {
+    return 'Session live'
+  }
+
+  if (/focused /i.test(message)) {
+    return 'Session focused'
+  }
+
+  if (/comparing /i.test(message)) {
+    return 'Compare active'
+  }
+
+  return message.length > 18 ? `${message.slice(0, 18)}…` : message
 }
 
 export default App

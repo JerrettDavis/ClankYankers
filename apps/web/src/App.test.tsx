@@ -44,10 +44,20 @@ const appState: AppStateResponse = {
     ],
   },
   sessions: [],
+  claudeHome: {
+    rootDisplayPath: '~/.claude',
+    exists: true,
+    agentCount: 0,
+    skillCount: 0,
+    commandCount: 0,
+    mcpArtifactCount: 0,
+    settings: null,
+  },
 }
 
 describe('App', () => {
   beforeEach(() => {
+    window.location.hash = '#/workspace'
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
@@ -67,15 +77,18 @@ describe('App', () => {
   })
 
   afterEach(() => {
+    window.location.hash = ''
     vi.unstubAllGlobals()
   })
 
-  it('renders the launch controls and empty terminal state', async () => {
+  it('renders the studio shell and workspace launch controls', async () => {
     render(<App />)
 
+    expect(await screen.findByRole('heading', { name: /terminal work stays first-class/i })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: /new session/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /launch session/i })).toBeInTheDocument()
     expect(screen.getAllByText(/no live sessions yet/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /save config/i })).toBeInTheDocument()
+    expect(screen.getByTestId('nav-section-overview')).toBeInTheDocument()
   })
 })

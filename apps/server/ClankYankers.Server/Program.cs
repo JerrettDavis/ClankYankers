@@ -1,7 +1,9 @@
 using ClankYankers.Server.Core.Contracts;
+using ClankYankers.Server.Features.ClaudeHome;
 using ClankYankers.Server.Features.Config;
 using ClankYankers.Server.Features.Sessions;
 using ClankYankers.Server.Infrastructure.Backplanes;
+using ClankYankers.Server.Infrastructure.ClaudeHome;
 using ClankYankers.Server.Infrastructure.Config;
 using ClankYankers.Server.Infrastructure.Connectors;
 using ClankYankers.Server.Infrastructure.Observability;
@@ -33,6 +35,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<IConfigStore, JsonConfigStore>();
 builder.Services.AddSingleton<IEventBus, InMemoryEventBus>();
 builder.Services.AddSingleton<SessionAuditLogger>();
+builder.Services.AddSingleton<ClaudeHomeCatalog>();
 builder.Services.AddSingleton<IPtyProcessFactory, WindowsConPtyProcessFactory>();
 builder.Services.AddSingleton<IBackplane, LocalBackplane>();
 builder.Services.AddSingleton<IBackplane, DockerBackplane>();
@@ -55,6 +58,7 @@ var api = app.MapGroup("/api");
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 ConfigEndpoints.Map(api);
 SessionEndpoints.Map(api);
+ClaudeHomeEndpoints.Map(api);
 
 app.MapGet("/", () => Results.Ok(new { name = "ClankYankers.Server" }));
 app.Map("/ws/session/{sessionId}", SessionWebSocketHandler.HandleAsync);
