@@ -50,7 +50,7 @@ public sealed class DockerBackplane(ILogger<DockerBackplane> logger) : IBackplan
             throw new InvalidOperationException($"Docker container '{createResponse.ID}' did not start.");
         }
 
-        var stream = await client.Containers.AttachContainerAsync(createResponse.ID, false, new ContainerAttachParameters
+        var stream = await client.Containers.AttachContainerAsync(createResponse.ID, true, new ContainerAttachParameters
         {
             Stream = true,
             Stdin = true,

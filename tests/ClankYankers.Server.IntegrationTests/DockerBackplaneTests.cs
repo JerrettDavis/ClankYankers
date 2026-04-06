@@ -24,7 +24,9 @@ public sealed class DockerBackplaneTests
                 BackplaneId = "docker",
                 DisplayName = "Docker",
                 ShellExecutable = "/bin/sh",
-                DockerEndpoint = "npipe://./pipe/docker_engine",
+                DockerEndpoint = OperatingSystem.IsWindows()
+                    ? "npipe://./pipe/docker_engine"
+                    : "unix:///var/run/docker.sock",
                 DockerImage = "alpine:3.20",
                 WorkingDirectory = "/workspace"
             },

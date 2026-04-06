@@ -1,0 +1,32 @@
+'area: server':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'apps/server/**/*'
+
+'area: web':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'apps/web/**/*'
+
+'area: documentation':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.md'
+      - 'docs/**/*'
+
+'area: tests':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/**/*'
+
+'area: ci/cd':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**/*'
+
+'dependencies':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.csproj'
+      - '**/package.json'
+      - '**/package-lock.json'
