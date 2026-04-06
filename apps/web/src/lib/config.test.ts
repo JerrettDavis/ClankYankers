@@ -33,6 +33,7 @@ const config: AppConfig = {
       enabled: true,
     },
   ],
+  experiments: [],
 }
 
 describe('config helpers', () => {

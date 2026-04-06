@@ -42,8 +42,22 @@ const appState: AppStateResponse = {
         enabled: true,
       },
     ],
+    experiments: [
+      {
+        id: 'local-shell-smoke',
+        displayName: 'Local shell smoke',
+        description: 'Smoke test for the local shell.',
+        hostIds: ['local-host'],
+        connectorIds: ['shell'],
+        models: [],
+        cols: 120,
+        rows: 34,
+        enabled: true,
+      },
+    ],
   },
   sessions: [],
+  experimentRuns: [],
   claudeHome: {
     rootDisplayPath: '~/.claude',
     exists: true,
@@ -108,6 +122,69 @@ describe('App', () => {
     expect(screen.getAllByText(/no live sessions yet/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /save config/i })).toBeInTheDocument()
     expect(screen.getByTestId('nav-section-overview')).toBeInTheDocument()
+  })
+
+  it('launches an experiment from the lab surface', async () => {
+    window.location.hash = '#/lab'
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/api/app-state')) {
+        return new Response(JSON.stringify(appState), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (String(input).endsWith('/api/experiments/local-shell-smoke/runs') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            id: 'run-1',
+            experimentId: 'local-shell-smoke',
+            experimentDisplayName: 'Local shell smoke',
+            experimentDescription: 'Smoke test for the local shell.',
+            createdAt: new Date().toISOString(),
+            activeSessionCount: 1,
+            variantCount: 1,
+            variants: [
+              {
+                sessionId: 'session-1',
+                backplaneId: 'local',
+                hostId: 'local-host',
+                connectorId: 'shell',
+                model: null,
+              },
+            ],
+          }),
+          {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      if (String(input).endsWith('/api/sessions')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /experiment matrix and recent runs/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByTestId('run-experiment-local-shell-smoke')[0])
+
+    await waitFor(() => {
+      expect(screen.getByText('1/1 active')).toBeInTheDocument()
+    })
   })
 
   it('loads and refreshes the sanitized Claude agent catalog explicitly', async () => {

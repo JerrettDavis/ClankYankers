@@ -4,6 +4,8 @@ public sealed record SessionSummary
 {
     public required string Id { get; init; }
 
+    public string? ExperimentId { get; init; }
+
     public required string BackplaneId { get; init; }
 
     public required string HostId { get; init; }

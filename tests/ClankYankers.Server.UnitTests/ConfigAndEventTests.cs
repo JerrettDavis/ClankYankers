@@ -3,6 +3,7 @@ using ClankYankers.Server.Core.Models;
 using ClankYankers.Server.Features.Config;
 using ClankYankers.Server.Features.Sessions;
 using ClankYankers.Server.Infrastructure.Observability;
+using Microsoft.Extensions.Logging;
 
 namespace ClankYankers.Server.UnitTests;
 
@@ -70,6 +71,48 @@ public sealed class ConfigAndEventTests
         var errors = ConfigValidator.Validate(config);
 
         Assert.Contains("backplanes.kind", errors.Keys);
+    }
+
+    [Fact]
+    public void ConfigValidator_accepts_registry_provided_kinds()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "ssh",
+                    DisplayName = "SSH",
+                    Kind = "ssh"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "ssh-host",
+                    BackplaneId = "ssh",
+                    DisplayName = "Remote shell",
+                    ShellExecutable = "ssh"
+                }
+            ],
+            Connectors =
+            [
+                new ConnectorDefinition
+                {
+                    Id = "gemini",
+                    DisplayName = "Gemini",
+                    Kind = "gemini",
+                    LaunchCommand = "gemini"
+                }
+            ]
+        };
+
+        var errors = ConfigValidator.Validate(config, ["ssh"], ["gemini"]);
+
+        Assert.DoesNotContain("backplanes.kind", errors.Keys);
+        Assert.DoesNotContain("connectors.kind", errors.Keys);
     }
 
     [Fact]
@@ -173,11 +216,92 @@ public sealed class ConfigAndEventTests
     }
 
     [Fact]
+    public void ConfigValidator_rejects_invalid_experiment_references()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Experiments =
+            [
+                new ExperimentDefinition
+                {
+                    Id = "broken",
+                    DisplayName = "Broken",
+                    HostIds = ["missing-host"],
+                    ConnectorIds = ["shell", "missing-connector"],
+                    Cols = 10,
+                    Rows = 200
+                }
+            ]
+        };
+
+        var errors = ConfigValidator.Validate(config);
+
+        Assert.Contains("experiments.hostIds.unknown", errors.Keys);
+        Assert.Contains("experiments.connectorIds.unknown", errors.Keys);
+        Assert.Contains("experiments.dimensions", errors.Keys);
+    }
+
+    [Fact]
+    public void ConfigValidator_rejects_oversized_experiment_matrices()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Experiments =
+            [
+                new ExperimentDefinition
+                {
+                    Id = "too-big",
+                    DisplayName = "Too big",
+                    HostIds = Enumerable.Range(1, 5).Select(index => $"host-{index}").ToArray(),
+                    ConnectorIds = Enumerable.Range(1, 5).Select(index => $"connector-{index}").ToArray(),
+                    Models = ["a", "b"]
+                }
+            ],
+            Hosts = Enumerable.Range(1, 5).Select(index => new HostConfig
+            {
+                Id = $"host-{index}",
+                BackplaneId = "local",
+                DisplayName = $"Host {index}",
+                ShellExecutable = "pwsh.exe"
+            }).ToArray(),
+            Connectors = Enumerable.Range(1, 5).Select(index => new ConnectorDefinition
+            {
+                Id = $"connector-{index}",
+                DisplayName = $"Connector {index}",
+                Kind = "shell"
+            }).ToArray()
+        };
+
+        var errors = ConfigValidator.Validate(config);
+
+        Assert.Contains("experiments.variantCount", errors.Keys);
+    }
+
+    [Fact]
     public async Task InMemoryEventBus_delivers_events_to_subscribers()
     {
-        var eventBus = new InMemoryEventBus();
+        var eventBus = new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>());
         RuntimeErrorEvent? captured = null;
 
+        eventBus.Subscribe<RuntimeErrorEvent>((eventData, _) =>
+        {
+            captured = eventData;
+            return Task.CompletedTask;
+        });
+
+        var expected = new RuntimeErrorEvent("session-1", "boom", DateTimeOffset.UtcNow);
+        await eventBus.PublishAsync(expected);
+
+        Assert.Equal(expected, captured);
+    }
+
+    [Fact]
+    public async Task InMemoryEventBus_isolates_subscriber_failures()
+    {
+        var eventBus = new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>());
+        RuntimeErrorEvent? captured = null;
+
+        eventBus.Subscribe<RuntimeErrorEvent>((_, _) => throw new InvalidOperationException("boom"));
         eventBus.Subscribe<RuntimeErrorEvent>((eventData, _) =>
         {
             captured = eventData;

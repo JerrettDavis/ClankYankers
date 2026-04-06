@@ -35,12 +35,45 @@ export interface AppConfig {
   backplanes: BackplaneDefinition[]
   hosts: HostConfig[]
   connectors: ConnectorDefinition[]
+  experiments: ExperimentDefinition[]
+}
+
+export interface ExperimentDefinition {
+  id: string
+  displayName: string
+  description: string | null
+  hostIds: string[]
+  connectorIds: string[]
+  models: string[]
+  cols: number
+  rows: number
+  enabled: boolean
+}
+
+export interface ExperimentRunVariant {
+  sessionId: string
+  backplaneId: string
+  hostId: string
+  connectorId: string
+  model: string | null
+}
+
+export interface ExperimentRunSummary {
+  id: string
+  experimentId: string
+  experimentDisplayName: string
+  experimentDescription: string | null
+  createdAt: string
+  activeSessionCount: number
+  variantCount: number
+  variants: ExperimentRunVariant[]
 }
 
 export type SessionState = 'Starting' | 'Running' | 'Stopped' | 'Failed'
 
 export interface SessionSummary {
   id: string
+  experimentId: string | null
   backplaneId: string
   hostId: string
   connectorId: string
@@ -56,6 +89,7 @@ export interface SessionSummary {
 export interface AppStateResponse {
   config: AppConfig
   sessions: SessionSummary[]
+  experimentRuns: ExperimentRunSummary[]
   claudeHome: ClaudeHomeSummary | null
 }
 

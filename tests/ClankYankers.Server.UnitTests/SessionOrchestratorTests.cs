@@ -15,11 +15,11 @@ public sealed class SessionOrchestratorTests
     public async Task StopAsync_removes_completed_sessions_from_the_live_registry()
     {
         var orchestrator = new SessionOrchestrator(
-            new FakeConfigStore(),
+            new FakeConfigStore(CreateLocalShellConfig()),
             new BackplaneRegistry([new FakeBackplane("local")]),
             new ConnectorRegistry([new ShellConnector()]),
             new SessionRegistry(),
-            new InMemoryEventBus(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
             LoggerFactory.Create(_ => { }));
 
         var session = await orchestrator.CreateAsync(
@@ -50,11 +50,11 @@ public sealed class SessionOrchestratorTests
     public async Task CreateAsync_rejects_hosts_that_do_not_belong_to_the_selected_backplane()
     {
         var orchestrator = new SessionOrchestrator(
-            new FakeConfigStore(),
+            new FakeConfigStore(CreateLocalDockerShellConfig()),
             new BackplaneRegistry([new FakeBackplane("local"), new FakeBackplane("docker")]),
             new ConnectorRegistry([new ShellConnector()]),
             new SessionRegistry(),
-            new InMemoryEventBus(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
             LoggerFactory.Create(_ => { }));
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -77,6 +77,26 @@ public sealed class SessionOrchestratorTests
     {
         var config = AppConfig.CreateDefault() with
         {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "local",
+                    DisplayName = "Local",
+                    Kind = "local"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "local-host",
+                    BackplaneId = "local",
+                    DisplayName = "This machine",
+                    ShellExecutable = "pwsh.exe",
+                    ShellArguments = ["-NoLogo"]
+                }
+            ],
             Connectors =
             [
                 new ConnectorDefinition
@@ -87,7 +107,8 @@ public sealed class SessionOrchestratorTests
                     LaunchCommand = "claude",
                     DefaultPermissionMode = "acceptEdits"
                 }
-            ]
+            ],
+            Experiments = []
         };
         var backplane = new FakeBackplane("local");
         var orchestrator = new SessionOrchestrator(
@@ -95,7 +116,7 @@ public sealed class SessionOrchestratorTests
             new BackplaneRegistry([backplane]),
             new ConnectorRegistry([new ClaudeConnector()]),
             new SessionRegistry(),
-            new InMemoryEventBus(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
             LoggerFactory.Create(_ => { }));
 
         var session = await orchestrator.CreateAsync(
@@ -140,7 +161,17 @@ public sealed class SessionOrchestratorTests
                     DisplayName = "Local",
                     ShellExecutable = "pwsh.exe"
                 }
-            ]
+            ],
+            Connectors =
+            [
+                new ConnectorDefinition
+                {
+                    Id = "shell",
+                    DisplayName = "Shell",
+                    Kind = "shell"
+                }
+            ],
+            Experiments = []
         };
         var backplane = new FakeBackplane("local");
         var orchestrator = new SessionOrchestrator(
@@ -148,7 +179,7 @@ public sealed class SessionOrchestratorTests
             new BackplaneRegistry([backplane]),
             new ConnectorRegistry([new ShellConnector()]),
             new SessionRegistry(),
-            new InMemoryEventBus(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
             LoggerFactory.Create(_ => { }));
 
         await orchestrator.CreateAsync(
@@ -171,6 +202,26 @@ public sealed class SessionOrchestratorTests
     {
         var config = AppConfig.CreateDefault() with
         {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "local",
+                    DisplayName = "Local",
+                    Kind = "local"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "local-host",
+                    BackplaneId = "local",
+                    DisplayName = "This machine",
+                    ShellExecutable = "pwsh.exe",
+                    ShellArguments = ["-NoLogo"]
+                }
+            ],
             Connectors =
             [
                 new ConnectorDefinition
@@ -180,14 +231,15 @@ public sealed class SessionOrchestratorTests
                     Kind = "shell",
                     Enabled = false
                 }
-            ]
+            ],
+            Experiments = []
         };
         var orchestrator = new SessionOrchestrator(
             new FakeConfigStore(config),
             new BackplaneRegistry([new FakeBackplane("local")]),
             new ConnectorRegistry([new ShellConnector()]),
             new SessionRegistry(),
-            new InMemoryEventBus(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
             LoggerFactory.Create(_ => { }));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -257,4 +309,54 @@ public sealed class SessionOrchestratorTests
             return ValueTask.CompletedTask;
         }
     }
+
+    private static AppConfig CreateLocalShellConfig() =>
+        AppConfig.CreateDefault() with
+        {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "local",
+                    DisplayName = "Local",
+                    Kind = "local"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "local-host",
+                    BackplaneId = "local",
+                    DisplayName = "This machine",
+                    ShellExecutable = "pwsh.exe",
+                    ShellArguments = ["-NoLogo"]
+                }
+            ],
+            Connectors =
+            [
+                new ConnectorDefinition
+                {
+                    Id = "shell",
+                    DisplayName = "Shell",
+                    Kind = "shell"
+                }
+            ],
+            Experiments = []
+        };
+
+    private static AppConfig CreateLocalDockerShellConfig() =>
+        AppConfig.CreateDefault() with
+        {
+            Connectors =
+            [
+                new ConnectorDefinition
+                {
+                    Id = "shell",
+                    DisplayName = "Shell",
+                    Kind = "shell"
+                }
+            ],
+            Experiments = []
+        };
 }

@@ -2,6 +2,7 @@ import type {
   AppConfig,
   BackplaneDefinition,
   ConnectorDefinition,
+  ExperimentDefinition,
   HostConfig,
   SessionState,
   SessionSummary,
@@ -129,6 +130,24 @@ export function createConnectorDefinition(): ConnectorDefinition {
     allowedTools: [],
     skipPermissions: false,
     enabled: true,
+  }
+}
+
+export function createExperimentDefinition(config: AppConfig): ExperimentDefinition {
+  const id = uniqueId('experiment')
+  const defaultHost = config.hosts.find((host) => host.enabled)?.id
+  const defaultConnector = config.connectors.find((connector) => connector.enabled)?.id
+
+  return {
+    id,
+    displayName: `New experiment ${id.slice(-4)}`,
+    description: null,
+    hostIds: defaultHost ? [defaultHost] : [],
+    connectorIds: defaultConnector ? [defaultConnector] : [],
+    models: [],
+    cols: 120,
+    rows: 34,
+    enabled: Boolean(defaultHost && defaultConnector),
   }
 }
 

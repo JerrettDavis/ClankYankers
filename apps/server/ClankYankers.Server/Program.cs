@@ -1,6 +1,7 @@
 using ClankYankers.Server.Core.Contracts;
 using ClankYankers.Server.Features.ClaudeHome;
 using ClankYankers.Server.Features.Config;
+using ClankYankers.Server.Features.Experiments;
 using ClankYankers.Server.Features.Sessions;
 using ClankYankers.Server.Infrastructure.Backplanes;
 using ClankYankers.Server.Infrastructure.ClaudeHome;
@@ -46,6 +47,7 @@ builder.Services.AddSingleton<BackplaneRegistry>();
 builder.Services.AddSingleton<ConnectorRegistry>();
 builder.Services.AddSingleton<SessionRegistry>();
 builder.Services.AddSingleton<SessionOrchestrator>();
+builder.Services.AddSingleton<ExperimentOrchestrator>();
 
 var app = builder.Build();
 
@@ -58,6 +60,10 @@ var api = app.MapGroup("/api");
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 ConfigEndpoints.Map(api);
 SessionEndpoints.Map(api);
+if (app.Environment.IsDevelopment())
+{
+    ExperimentEndpoints.Map(api);
+}
 ClaudeHomeEndpoints.Map(api);
 
 app.MapGet("/", () => Results.Ok(new { name = "ClankYankers.Server" }));

@@ -77,5 +77,39 @@
       "skipPermissions": false,
       "enabled": true
     }
+  ],
+  "experiments": [
+    {
+      "id": "local-shell-smoke",
+      "displayName": "Local shell smoke",
+      "description": "Launch the local shell through the studio so operators can validate the end-to-end runtime path quickly.",
+      "hostIds": [
+        "local-host"
+      ],
+      "connectorIds": [
+        "shell"
+      ],
+      "models": [],
+      "cols": 120,
+      "rows": 34,
+      "enabled": true
+    },
+    {
+      "id": "connector-sweep",
+      "displayName": "Connector sweep",
+      "description": "Draft matrix for comparing agent CLIs on the same host once provider availability is confirmed.",
+      "hostIds": [
+        "local-host"
+      ],
+      "connectorIds": [
+        "shell",
+        "claude",
+        "ollama"
+      ],
+      "models": [],
+      "cols": 120,
+      "rows": 34,
+      "enabled": false
+    }
   ]
 }

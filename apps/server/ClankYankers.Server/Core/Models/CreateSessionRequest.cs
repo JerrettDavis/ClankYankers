@@ -2,6 +2,8 @@ namespace ClankYankers.Server.Core.Models;
 
 public sealed record CreateSessionRequest
 {
+    public string? ExperimentId { get; init; }
+
     public string? BackplaneId { get; init; }
 
     public string? HostId { get; init; }

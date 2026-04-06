@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppConfig, ClaudeHomeCatalogResponse } from '../types'
-import { loadClaudeHomeCatalog, saveConfig, stopSession } from './api'
+import { loadClaudeHomeCatalog, runExperiment, saveConfig, stopSession } from './api'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -68,6 +68,7 @@ describe('api client', () => {
           enabled: true,
         },
       ],
+      experiments: [],
     }
 
     await expect(saveConfig(invalidConfig)).rejects.toMatchObject({
@@ -94,5 +95,35 @@ describe('api client', () => {
     )
 
     await expect(loadClaudeHomeCatalog()).resolves.toEqual(catalog)
+  })
+
+  it('starts an experiment run from the lab endpoint', async () => {
+    const run = {
+      id: 'run-1',
+      experimentId: 'local-shell-smoke',
+      experimentDisplayName: 'Local shell smoke',
+      experimentDescription: 'Smoke test for the local shell.',
+      createdAt: '2026-04-06T00:00:00Z',
+      activeSessionCount: 1,
+      variantCount: 1,
+      variants: [
+        {
+          sessionId: 'session-1',
+          backplaneId: 'local',
+          hostId: 'local-host',
+          connectorId: 'shell',
+          model: null,
+        },
+      ],
+    }
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(run), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await expect(runExperiment('local-shell-smoke')).resolves.toEqual(run)
   })
 })

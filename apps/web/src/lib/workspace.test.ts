@@ -16,6 +16,7 @@ import {
 const sessions: SessionSummary[] = [
   {
     id: 'alpha',
+    experimentId: null,
     backplaneId: 'local',
     hostId: 'local-host',
     connectorId: 'shell',
@@ -29,6 +30,7 @@ const sessions: SessionSummary[] = [
   },
   {
     id: 'beta',
+    experimentId: null,
     backplaneId: 'docker',
     hostId: 'docker-host',
     connectorId: 'shell',

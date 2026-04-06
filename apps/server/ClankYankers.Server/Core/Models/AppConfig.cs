@@ -10,6 +10,8 @@ public sealed record AppConfig
 
     public required IReadOnlyList<ConnectorDefinition> Connectors { get; init; }
 
+    public IReadOnlyList<ExperimentDefinition> Experiments { get; init; } = [];
+
     public static AppConfig CreateDefault() =>
         new()
         {
@@ -77,6 +79,26 @@ public sealed record AppConfig
                     LaunchCommand = "claude",
                     DefaultPermissionMode = "default"
                 }
+            ],
+            Experiments =
+            [
+                new ExperimentDefinition
+                {
+                    Id = "local-shell-smoke",
+                    DisplayName = "Local shell smoke",
+                    Description = "Launch the local shell through the studio so operators can validate the end-to-end runtime path quickly.",
+                    HostIds = ["local-host"],
+                    ConnectorIds = ["shell"]
+                },
+                new ExperimentDefinition
+                {
+                    Id = "connector-sweep",
+                    DisplayName = "Connector sweep",
+                    Description = "Draft matrix for comparing agent CLIs on the same host once provider availability is confirmed.",
+                    HostIds = ["local-host"],
+                    ConnectorIds = ["shell", "claude", "ollama"],
+                    Enabled = false
+                }
             ]
         };
 }
@@ -132,6 +154,27 @@ public sealed record ConnectorDefinition
     public IReadOnlyList<string> AllowedTools { get; init; } = [];
 
     public bool SkipPermissions { get; init; }
+
+    public bool Enabled { get; init; } = true;
+}
+
+public sealed record ExperimentDefinition
+{
+    public required string Id { get; init; }
+
+    public required string DisplayName { get; init; }
+
+    public string? Description { get; init; }
+
+    public IReadOnlyList<string> HostIds { get; init; } = [];
+
+    public IReadOnlyList<string> ConnectorIds { get; init; } = [];
+
+    public IReadOnlyList<string> Models { get; init; } = [];
+
+    public int Cols { get; init; } = 120;
+
+    public int Rows { get; init; } = 34;
 
     public bool Enabled { get; init; } = true;
 }

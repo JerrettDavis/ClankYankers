@@ -1,6 +1,7 @@
 using ClankYankers.Server.Core.Contracts;
 using ClankYankers.Server.Core.Events;
 using ClankYankers.Server.Core.Models;
+using ClankYankers.Server.Features.Config;
 using ClankYankers.Server.Infrastructure.Registry;
 
 namespace ClankYankers.Server.Features.Sessions;
@@ -22,6 +23,11 @@ public sealed class SessionOrchestrator(
     public async Task<SessionSummary> CreateAsync(CreateSessionRequest request, CancellationToken cancellationToken)
     {
         var config = await configStore.LoadAsync(cancellationToken);
+        ConfigValidator.ThrowIfInvalid(
+            config,
+            backplaneRegistry.Kinds,
+            connectorRegistry.Kinds,
+            "Persisted config is invalid for session execution.");
 
         var connectorDefinition = ResolveConnectorDefinition(config, request);
         var backplaneDefinition = ResolveBackplaneDefinition(config, request, connectorDefinition);
@@ -56,6 +62,7 @@ public sealed class SessionOrchestrator(
             var summary = new SessionSummary
             {
                 Id = sessionId,
+                ExperimentId = request.ExperimentId,
                 BackplaneId = backplaneDefinition.Id,
                 HostId = host.Id,
                 ConnectorId = connectorDefinition.Id,

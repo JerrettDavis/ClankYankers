@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 
 import { TerminalPane } from './components/TerminalPane'
-import { ApiError, createSession, loadAppState, loadClaudeHomeCatalog, loadSessions, saveConfig, stopSession } from './lib/api'
+import { ApiError, createSession, loadAppState, loadClaudeHomeCatalog, loadSessions, runExperiment, saveConfig, stopSession } from './lib/api'
 import {
   coerceLaunchDraft,
+  createExperimentDefinition,
   createBackplaneDefinition,
   createConnectorDefinition,
   createHostConfig,
@@ -36,6 +37,8 @@ import type {
   ClaudeHomeCatalogResponse,
   ClaudeHomeSummary,
   ConnectorDefinition,
+  ExperimentDefinition,
+  ExperimentRunSummary,
   HostConfig,
   SessionSummary,
   TerminalServerMessage,
@@ -236,6 +239,7 @@ function App() {
   const [claudeHome, setClaudeHome] = useState<ClaudeHomeSummary | null>(null)
   const [claudeCatalog, setClaudeCatalog] = useState<ClaudeHomeCatalogResponse | null>(null)
   const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [experimentRuns, setExperimentRuns] = useState<ExperimentRunSummary[]>([])
   const [launchDraft, setLaunchDraft] = useState<LaunchDraft>({
     backplaneId: '',
     hostId: '',
@@ -249,6 +253,7 @@ function App() {
   const [isCreatingSession, setIsCreatingSession] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isRunningExperiment, setIsRunningExperiment] = useState(false)
   const [isStoppingSession, setIsStoppingSession] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string>('Control deck ready.')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -278,6 +283,7 @@ function App() {
       setClaudeHome(state.claudeHome)
       setClaudeCatalog(null)
       setSessions(state.sessions)
+      setExperimentRuns(state.experimentRuns)
       setWorkspace(createInitialWorkspace(state.sessions))
       setLaunchDraft(coerceLaunchDraft(state.config))
       setConfigDirty(false)
@@ -296,6 +302,7 @@ function App() {
 
       const nextState = await loadAppState()
       setSessions(nextState.sessions)
+      setExperimentRuns(nextState.experimentRuns)
       setClaudeHome(nextState.claudeHome)
 
       if (activeSection === 'agents' || activeSection === 'skills') {
@@ -493,6 +500,21 @@ function App() {
     }
   }
 
+  const handleRunExperiment = async (experimentId: string) => {
+    try {
+      setIsRunningExperiment(true)
+      setErrorMessage(null)
+      const run = await runExperiment(experimentId)
+      setExperimentRuns((current) => [run, ...current.filter((item) => item.id !== run.id)])
+      await refreshSessions()
+      setStatusMessage(`Experiment ${formatWorkspaceLabel(run.experimentDisplayName)} launched ${run.variantCount} run${run.variantCount === 1 ? '' : 's'}.`)
+    } catch (error) {
+      setErrorMessage(asMessage(error))
+    } finally {
+      setIsRunningExperiment(false)
+    }
+  }
+
   const handleResetDraft = () => {
     if (!savedConfig) {
       return
@@ -681,6 +703,10 @@ function App() {
       : mcpBlueprints
   const runningSessionCount = sessions.filter((session) => session.state === 'Running').length
   const attentionSessionCount = sessions.filter((session) => session.state === 'Failed').length
+  const experimentSessionCount = sessions.filter((session) => session.experimentId).length
+  const enabledExperimentCount = savedConfig.experiments.filter((experiment) => experiment.enabled).length
+  const activeExperimentRunCount = experimentRuns.filter((run) => run.activeSessionCount > 0).length
+  const launchedVariantCount = experimentRuns.reduce((total, run) => total + run.variantCount, 0)
   const sessionMetrics: MetricItem[] = [
     {
       label: 'Live sessions',
@@ -720,6 +746,28 @@ function App() {
       detail: claudeHome?.exists ? `${claudeAgentCount} agents and ${claudeSkillCount} skills discovered` : 'No ~/.claude catalog detected',
     },
   ]
+  const labMetrics: MetricItem[] = [
+    {
+      label: 'Experiments',
+      value: savedConfig.experiments.length,
+      detail: `${enabledExperimentCount} enabled definitions ready for launch`,
+    },
+    {
+      label: 'Run groups',
+      value: experimentRuns.length,
+      detail: experimentRuns.length > 0 ? `${activeExperimentRunCount} still have active sessions` : 'No experiment batches launched yet.',
+    },
+    {
+      label: 'Variants',
+      value: launchedVariantCount,
+      detail: launchedVariantCount > 0 ? 'Launched from saved experiment matrices.' : 'Waiting for the first structured run.',
+    },
+    {
+      label: 'Experiment sessions',
+      value: experimentSessionCount,
+      detail: experimentSessionCount > 0 ? 'Live sessions tied to an experiment definition.' : 'Manual launches still dominate the runtime ledger.',
+    },
+  ]
   const sectionBadges: Record<StudioSection, string | number> = {
     overview: `${runningSessionCount}/${sessions.length}`,
     workspace: formatWorkspaceLayout(workspace.layout),
@@ -727,7 +775,7 @@ function App() {
     backplanes: savedConfig.backplanes.length,
     hosts: savedConfig.hosts.length,
     connectors: savedConfig.connectors.length,
-    lab: labBlueprints.length,
+    lab: `${enabledExperimentCount}/${savedConfig.experiments.length}`,
     agents: claudeAgentCount || agentBlueprints.length,
     skills: claudeSkillCount || skillBlueprints.length,
     mcp: claudeMcpArtifactCount || claudeSettings?.enabledPluginCount || mcpBlueprints.length,
@@ -736,9 +784,14 @@ function App() {
   const openStudioSection = (section: StudioSection) => {
     setStudioSectionHash(section)
   }
-  const showConfigActions = ['workspace', 'backplanes', 'hosts', 'connectors'].includes(activeSection)
-  const refreshActionLabel = showConfigActions ? 'Refresh sessions' : 'Refresh'
-  const handleRefreshAction = showConfigActions ? refreshSessions : refreshStudioData
+  const showConfigActions = ['workspace', 'backplanes', 'hosts', 'connectors', 'lab'].includes(activeSection)
+  const refreshActionLabel =
+    activeSection === 'lab'
+      ? 'Refresh lab'
+      : showConfigActions
+        ? 'Refresh sessions'
+        : 'Refresh'
+  const handleRefreshAction = activeSection === 'lab' ? refreshStudioData : showConfigActions ? refreshSessions : refreshStudioData
   const handleOpenWorkspaceSession = (session: SessionSummary, target: 'primary' | 'secondary' = 'primary') => {
     setStudioSectionHash('workspace')
     handleOpenSession(session, target)
@@ -971,20 +1024,35 @@ function App() {
       break
     case 'lab':
       currentPage = (
-        <BlueprintPage
-          eyebrow="Experiment lab"
-          title="Run structured experiments"
-          description="Turn the studio into a repeatable validation surface: compare outputs, rehearse workflows, and capture evidence."
-          cards={labBlueprints}
-          metrics={[
-            { label: 'Recipes', value: labBlueprints.length, detail: 'Experiment templates ready to implement.' },
-            { label: 'Available connectors', value: enabledConnectors.length, detail: 'Candidate runtimes for experiment matrices.' },
-            { label: 'Recent sessions', value: sessions.length, detail: 'Live material already flowing through the lab.' },
-          ]}
-          quickLinks={[
-            { href: createStudioSectionHref('workspace'), label: 'Open workspace' },
-            { href: createStudioSectionHref('connectors'), label: 'Tune connectors' },
-          ]}
+        <LabPage
+          configDirty={configDirty}
+          experiments={configDraft.experiments}
+          experimentRuns={experimentRuns}
+          isRunningExperiment={isRunningExperiment}
+          metrics={labMetrics}
+          onAddExperiment={() =>
+            updateConfigDraft((current) => ({
+              ...current,
+              experiments: [...current.experiments, createExperimentDefinition(current)],
+            }))
+          }
+          onExperimentChange={(index, nextValue) =>
+            updateConfigDraft((current) => ({
+              ...current,
+              experiments: updateItem(current.experiments, index, nextValue),
+            }))
+          }
+          onExperimentRemove={(index) =>
+            updateConfigDraft((current) => ({
+              ...current,
+              experiments: current.experiments.filter((_, itemIndex) => itemIndex !== index),
+            }))
+          }
+          onOpenSection={openStudioSection}
+          onOpenSession={handleOpenWorkspaceSession}
+          onRunExperiment={handleRunExperiment}
+          sessions={sessions}
+          templates={labBlueprints}
         />
       )
       break
@@ -2072,6 +2140,139 @@ function SessionsPage({
   )
 }
 
+function LabPage({
+  configDirty,
+  experiments,
+  experimentRuns,
+  isRunningExperiment,
+  metrics,
+  onAddExperiment,
+  onExperimentChange,
+  onExperimentRemove,
+  onOpenSection,
+  onOpenSession,
+  onRunExperiment,
+  sessions,
+  templates,
+}: {
+  configDirty: boolean
+  experiments: ExperimentDefinition[]
+  experimentRuns: ExperimentRunSummary[]
+  isRunningExperiment: boolean
+  metrics: MetricItem[]
+  onAddExperiment: () => void
+  onExperimentChange: (index: number, value: ExperimentDefinition) => void
+  onExperimentRemove: (index: number) => void
+  onOpenSection: (section: StudioSection) => void
+  onOpenSession: (session: SessionSummary, target?: 'primary' | 'secondary') => void
+  onRunExperiment: (experimentId: string) => void
+  sessions: SessionSummary[]
+  templates: BlueprintCard[]
+}) {
+  const sessionMap = new Map(sessions.map((session) => [session.id, session]))
+
+  return (
+    <InventoryPage
+      eyebrow="Experiment lab"
+      title="Experiment matrix and recent runs"
+      description="Define reusable execution matrices, launch them as a batch, and route the resulting sessions back into the workspace with traceable context."
+      metrics={metrics}
+      aside={
+        <>
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Recent run groups</p>
+                <h2>Execution ledger</h2>
+              </div>
+            </div>
+            {experimentRuns.length > 0 ? (
+              <div className="summary-list">
+                {experimentRuns.slice(0, 6).map((run) => (
+                  <article key={run.id}>
+                    <span>{run.experimentDisplayName}</span>
+                    <strong>{run.activeSessionCount}/{run.variantCount} active</strong>
+                    <small>{new Date(run.createdAt).toLocaleString()}</small>
+                    <div className="inline-actions inline-actions--compact">
+                      {run.variants.slice(0, 2).map((variant) => {
+                        const session = sessionMap.get(variant.sessionId)
+                        if (!session) {
+                          return null
+                        }
+
+                        return (
+                          <button
+                            className="button button--ghost"
+                            key={variant.sessionId}
+                            onClick={() => onOpenSession(session)}
+                            type="button"
+                          >
+                            Open {formatWorkspaceLabel(session.id)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-callout">
+                <p className="eyebrow">No run groups yet</p>
+                <p>Launch a saved experiment to create the first structured execution batch.</p>
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Starter patterns</p>
+                <h2>What to model next</h2>
+              </div>
+            </div>
+            <div className="summary-list">
+              {templates.slice(0, 3).map((template) => (
+                <article key={template.title}>
+                  <span>{template.eyebrow}</span>
+                  <strong>{template.title}</strong>
+                  <p>{template.description}</p>
+                </article>
+              ))}
+            </div>
+            <div className="inline-actions">
+              <button className="button button--ghost" onClick={() => onOpenSection('workspace')} type="button">
+                Open workspace
+              </button>
+              <button className="button button--ghost" onClick={() => onOpenSection('connectors')} type="button">
+                Tune connectors
+              </button>
+            </div>
+          </section>
+        </>
+      }
+    >
+      <ConfigBlock
+        title="Experiment definitions"
+        description="Saved execution matrices that can be launched repeatedly across hosts, connectors, and model variants."
+        actionLabel="Add experiment"
+        onAdd={onAddExperiment}
+      >
+        {experiments.map((experiment, index) => (
+          <ExperimentEditor
+            configDirty={configDirty}
+            experiment={experiment}
+            isRunningExperiment={isRunningExperiment}
+            key={experiment.id}
+            onChange={(nextValue) => onExperimentChange(index, nextValue)}
+            onRemove={() => onExperimentRemove(index)}
+            onRun={() => onRunExperiment(experiment.id)}
+          />
+        ))}
+      </ConfigBlock>
+    </InventoryPage>
+  )
+}
+
 interface InventoryPageProps {
   aside?: ReactNode
   children: ReactNode
@@ -2741,6 +2942,126 @@ function ConnectorEditor({ connector, onChange, onRemove }: ConnectorEditorProps
             type="checkbox"
             checked={connector.enabled}
             onChange={(event) => onChange({ ...connector, enabled: event.target.checked })}
+          />
+          <span>Enabled</span>
+        </label>
+      </div>
+    </article>
+  )
+}
+
+interface ExperimentEditorProps {
+  configDirty: boolean
+  experiment: ExperimentDefinition
+  isRunningExperiment: boolean
+  onChange: (value: ExperimentDefinition) => void
+  onRemove: () => void
+  onRun: () => void
+}
+
+function ExperimentEditor({ configDirty, experiment, isRunningExperiment, onChange, onRemove, onRun }: ExperimentEditorProps) {
+  return (
+    <article className="config-card" data-testid={`experiment-card-${experiment.id}`}>
+      <header className="config-card__header">
+        <div>
+          <strong>{experiment.id}</strong>
+          <p>{experiment.displayName}</p>
+        </div>
+        <div className="inline-actions inline-actions--compact">
+          <button
+            className="button button--ghost"
+            data-testid={`run-experiment-${experiment.id}`}
+            disabled={configDirty || isRunningExperiment || !experiment.enabled}
+            onClick={onRun}
+            type="button"
+          >
+            {isRunningExperiment ? 'Running…' : 'Run now'}
+          </button>
+          <button className="button button--ghost" onClick={onRemove} type="button">
+            Remove
+          </button>
+        </div>
+      </header>
+      <div className="config-card__grid">
+        <label className="field">
+          <span>ID</span>
+          <input value={experiment.id} onChange={(event) => onChange({ ...experiment, id: event.target.value })} />
+        </label>
+        <label className="field">
+          <span>Name</span>
+          <input
+            value={experiment.displayName}
+            onChange={(event) => onChange({ ...experiment, displayName: event.target.value })}
+          />
+        </label>
+        <label className="field">
+          <span>Description</span>
+          <input
+            value={experiment.description ?? ''}
+            onChange={(event) =>
+              onChange({ ...experiment, description: event.target.value.trim() || null })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Host ids</span>
+          <input
+            placeholder="local-host, docker-local"
+            value={formatArgumentList(experiment.hostIds)}
+            onChange={(event) =>
+              onChange({ ...experiment, hostIds: parseArgumentList(event.target.value) })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Connector ids</span>
+          <input
+            placeholder="shell, claude"
+            value={formatArgumentList(experiment.connectorIds)}
+            onChange={(event) =>
+              onChange({ ...experiment, connectorIds: parseArgumentList(event.target.value) })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Models</span>
+          <input
+            placeholder="Leave blank to use connector defaults"
+            value={formatArgumentList(experiment.models)}
+            onChange={(event) =>
+              onChange({ ...experiment, models: parseArgumentList(event.target.value) })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Columns</span>
+          <input
+            type="number"
+            min={24}
+            max={240}
+            value={experiment.cols}
+            onChange={(event) =>
+              onChange({ ...experiment, cols: Number(event.target.value) || 120 })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Rows</span>
+          <input
+            type="number"
+            min={12}
+            max={120}
+            value={experiment.rows}
+            onChange={(event) =>
+              onChange({ ...experiment, rows: Number(event.target.value) || 34 })
+            }
+          />
+        </label>
+        <label className="toggle">
+          <input
+            checked={experiment.enabled}
+            onChange={(event) => onChange({ ...experiment, enabled: event.target.checked })}
+            type="checkbox"
           />
           <span>Enabled</span>
         </label>

@@ -5,6 +5,7 @@ import type {
   ClaudeHomeCatalogResponse,
   ClaudeHomeSummary,
   CreateSessionRequest,
+  ExperimentRunSummary,
   SessionSummary,
 } from '../types'
 import { normalizeSession } from './config'
@@ -25,6 +26,7 @@ export async function loadAppState(signal?: AbortSignal): Promise<AppStateRespon
   const response = await requestJson<{
     config: AppConfig
     sessions: Array<Omit<SessionSummary, 'state'> & { state: number | string }>
+    experimentRuns: ExperimentRunSummary[]
     claudeHome: ClaudeHomeSummary | null
   }>('/api/app-state', {
     signal,
@@ -33,6 +35,7 @@ export async function loadAppState(signal?: AbortSignal): Promise<AppStateRespon
   return {
     config: response.config,
     sessions: response.sessions.map(normalizeSession),
+    experimentRuns: response.experimentRuns,
     claudeHome: response.claudeHome,
   }
 }
@@ -70,6 +73,12 @@ export async function saveConfig(config: AppConfig): Promise<AppConfig> {
   return requestJson<AppConfig>('/api/config', {
     method: 'PUT',
     body: JSON.stringify(config),
+  })
+}
+
+export async function runExperiment(experimentId: string): Promise<ExperimentRunSummary> {
+  return requestJson<ExperimentRunSummary>(`/api/experiments/${experimentId}/runs`, {
+    method: 'POST',
   })
 }
 

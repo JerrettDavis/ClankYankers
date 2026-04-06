@@ -208,7 +208,7 @@ public sealed class LocalBackplaneTests
                 CreatedAt = DateTimeOffset.UtcNow,
                 StartedAt = DateTimeOffset.UtcNow
             },
-            new InMemoryEventBus(),
+            new InMemoryEventBus(NullLogger<InMemoryEventBus>.Instance),
             NullLogger<Session>.Instance);
 
         await session.StopAsync(CancellationToken.None);
@@ -266,7 +266,7 @@ public sealed class LocalBackplaneTests
                 CreatedAt = DateTimeOffset.UtcNow,
                 StartedAt = DateTimeOffset.UtcNow
             },
-            new InMemoryEventBus(),
+            new InMemoryEventBus(NullLogger<InMemoryEventBus>.Instance),
             NullLogger<Session>.Instance);
 
         await session.WriteInputAsync("exit\r\n", CancellationToken.None);

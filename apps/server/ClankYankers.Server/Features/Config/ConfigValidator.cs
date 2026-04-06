@@ -4,14 +4,23 @@ namespace ClankYankers.Server.Features.Config;
 
 public static class ConfigValidator
 {
-    private static readonly string[] SupportedBackplaneKinds = ["local", "docker"];
-    private static readonly string[] SupportedConnectorKinds = ["shell", "ollama", "claude"];
+    public const int MaxExperimentVariantCount = 24;
+
     private static readonly string[] ReservedClaudeArguments =
         ["--model", "--permission-mode", "--dangerously-skip-permissions", "--allowedTools"];
 
-    public static IDictionary<string, string[]> Validate(AppConfig config)
+    public static IDictionary<string, string[]> Validate(
+        AppConfig config,
+        IEnumerable<string>? supportedBackplaneKinds = null,
+        IEnumerable<string>? supportedConnectorKinds = null)
     {
         var errors = new Dictionary<string, string[]>();
+        var supportedBackplanes = (supportedBackplaneKinds ?? ["local", "docker"])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var supportedConnectors = (supportedConnectorKinds ?? ["shell", "ollama", "claude"])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         if (config.Backplanes.Count == 0)
         {
@@ -156,14 +165,14 @@ public static class ConfigValidator
         }
 
         var unsupportedBackplaneKinds = config.Backplanes
-            .Where(backplane => !SupportedBackplaneKinds.Contains(backplane.Kind, StringComparer.OrdinalIgnoreCase))
+            .Where(backplane => !supportedBackplanes.Contains(backplane.Kind, StringComparer.OrdinalIgnoreCase))
             .Select(backplane => $"{backplane.Id} ({backplane.Kind})")
             .ToArray();
 
         if (unsupportedBackplaneKinds.Length > 0)
         {
             errors["backplanes.kind"] =
-                [$"Unsupported backplane kinds: {string.Join(", ", unsupportedBackplaneKinds)}. Supported kinds: {string.Join(", ", SupportedBackplaneKinds)}."];
+                [$"Unsupported backplane kinds: {string.Join(", ", unsupportedBackplaneKinds)}. Supported kinds: {string.Join(", ", supportedBackplanes)}."];
         }
 
         var duplicateConnectorIds = config.Connectors
@@ -198,14 +207,14 @@ public static class ConfigValidator
         }
 
         var unknownConnectorKinds = config.Connectors
-            .Where(connector => !SupportedConnectorKinds.Contains(connector.Kind, StringComparer.OrdinalIgnoreCase))
+            .Where(connector => !supportedConnectors.Contains(connector.Kind, StringComparer.OrdinalIgnoreCase))
             .Select(connector => $"{connector.Id} ({connector.Kind})")
             .ToArray();
 
         if (unknownConnectorKinds.Length > 0)
         {
             errors["connectors.kind"] =
-                [$"Unsupported connector kinds: {string.Join(", ", unknownConnectorKinds)}. Supported kinds: {string.Join(", ", SupportedConnectorKinds)}."];
+                [$"Unsupported connector kinds: {string.Join(", ", unknownConnectorKinds)}. Supported kinds: {string.Join(", ", supportedConnectors)}."];
         }
 
         if (!config.Connectors.Any(connector => connector.Enabled))
@@ -226,6 +235,179 @@ public static class ConfigValidator
                 [$"Claude connectors cannot set reserved launch arguments directly: {string.Join(", ", claudeConnectorsWithReservedArguments)}."];
         }
 
+        var duplicateExperimentIds = config.Experiments
+            .GroupBy(experiment => experiment.Id, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+
+        if (duplicateExperimentIds.Length > 0)
+        {
+            errors["experiments.id"] = [$"Duplicate experiment ids: {string.Join(", ", duplicateExperimentIds)}"];
+        }
+
+        var blankExperimentIds = config.Experiments
+            .Where(experiment => string.IsNullOrWhiteSpace(experiment.Id))
+            .Select((_, index) => $"index {index}")
+            .ToArray();
+
+        if (blankExperimentIds.Length > 0)
+        {
+            errors["experiments.id.required"] =
+                [$"Experiments must have non-empty ids: {string.Join(", ", blankExperimentIds)}."];
+        }
+
+        var blankExperimentNames = config.Experiments
+            .Where(experiment => string.IsNullOrWhiteSpace(experiment.DisplayName))
+            .Select(experiment => string.IsNullOrWhiteSpace(experiment.Id) ? "<blank-id>" : experiment.Id)
+            .ToArray();
+
+        if (blankExperimentNames.Length > 0)
+        {
+            errors["experiments.displayName"] =
+                [$"Experiments must have display names: {string.Join(", ", blankExperimentNames)}."];
+        }
+
+        var hostIds = config.Hosts
+            .Where(host => !string.IsNullOrWhiteSpace(host.Id))
+            .GroupBy(host => host.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var connectorIds = config.Connectors
+            .Where(connector => !string.IsNullOrWhiteSpace(connector.Id))
+            .GroupBy(connector => connector.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        var experimentsMissingHosts = config.Experiments
+            .Where(experiment => experiment.Enabled && experiment.HostIds.All(string.IsNullOrWhiteSpace))
+            .Select(experiment => experiment.Id)
+            .ToArray();
+
+        if (experimentsMissingHosts.Length > 0)
+        {
+            errors["experiments.hostIds"] =
+                [$"Enabled experiments require at least one host id: {string.Join(", ", experimentsMissingHosts)}."];
+        }
+
+        var experimentsMissingConnectors = config.Experiments
+            .Where(experiment => experiment.Enabled && experiment.ConnectorIds.All(string.IsNullOrWhiteSpace))
+            .Select(experiment => experiment.Id)
+            .ToArray();
+
+        if (experimentsMissingConnectors.Length > 0)
+        {
+            errors["experiments.connectorIds"] =
+                [$"Enabled experiments require at least one connector id: {string.Join(", ", experimentsMissingConnectors)}."];
+        }
+
+        var experimentsWithUnknownHosts = config.Experiments
+            .SelectMany(experiment => experiment.HostIds
+                .Where(hostId => !string.IsNullOrWhiteSpace(hostId) && !hostIds.ContainsKey(hostId))
+                .Select(hostId => $"{experiment.Id} ({hostId})"))
+            .ToArray();
+
+        if (experimentsWithUnknownHosts.Length > 0)
+        {
+            errors["experiments.hostIds.unknown"] =
+                [$"Experiments reference unknown hosts: {string.Join(", ", experimentsWithUnknownHosts)}."];
+        }
+
+        var experimentsWithDisabledHosts = config.Experiments
+            .SelectMany(experiment => experiment.HostIds
+                .Where(hostId => !string.IsNullOrWhiteSpace(hostId)
+                    && hostIds.TryGetValue(hostId, out var host)
+                    && !host.Enabled)
+                .Select(hostId => $"{experiment.Id} ({hostId})"))
+            .ToArray();
+
+        if (experimentsWithDisabledHosts.Length > 0)
+        {
+            errors["experiments.hostIds.disabled"] =
+                [$"Experiments reference disabled hosts: {string.Join(", ", experimentsWithDisabledHosts)}."];
+        }
+
+        var experimentsWithUnknownConnectors = config.Experiments
+            .SelectMany(experiment => experiment.ConnectorIds
+                .Where(connectorId => !string.IsNullOrWhiteSpace(connectorId) && !connectorIds.ContainsKey(connectorId))
+                .Select(connectorId => $"{experiment.Id} ({connectorId})"))
+            .ToArray();
+
+        if (experimentsWithUnknownConnectors.Length > 0)
+        {
+            errors["experiments.connectorIds.unknown"] =
+                [$"Experiments reference unknown connectors: {string.Join(", ", experimentsWithUnknownConnectors)}."];
+        }
+
+        var experimentsWithDisabledConnectors = config.Experiments
+            .SelectMany(experiment => experiment.ConnectorIds
+                .Where(connectorId => !string.IsNullOrWhiteSpace(connectorId)
+                    && connectorIds.TryGetValue(connectorId, out var connector)
+                    && !connector.Enabled)
+                .Select(connectorId => $"{experiment.Id} ({connectorId})"))
+            .ToArray();
+
+        if (experimentsWithDisabledConnectors.Length > 0)
+        {
+            errors["experiments.connectorIds.disabled"] =
+                [$"Experiments reference disabled connectors: {string.Join(", ", experimentsWithDisabledConnectors)}."];
+        }
+
+        var experimentsWithInvalidDimensions = config.Experiments
+            .Where(experiment => experiment.Cols is < 24 or > 240 || experiment.Rows is < 12 or > 120)
+            .Select(experiment => experiment.Id)
+            .ToArray();
+
+        if (experimentsWithInvalidDimensions.Length > 0)
+        {
+            errors["experiments.dimensions"] =
+                [$"Experiments must stay within supported terminal dimensions: {string.Join(", ", experimentsWithInvalidDimensions)}."];
+        }
+
+        var oversizedExperiments = config.Experiments
+            .Where(experiment => CalculateVariantCount(experiment) > MaxExperimentVariantCount)
+            .Select(experiment => $"{experiment.Id} ({CalculateVariantCount(experiment)} variants)")
+            .ToArray();
+
+        if (oversizedExperiments.Length > 0)
+        {
+            errors["experiments.variantCount"] =
+                [$"Experiments cannot exceed {MaxExperimentVariantCount} variants: {string.Join(", ", oversizedExperiments)}."];
+        }
+
         return errors;
+    }
+
+    public static void ThrowIfInvalid(
+        AppConfig config,
+        IEnumerable<string>? supportedBackplaneKinds = null,
+        IEnumerable<string>? supportedConnectorKinds = null,
+        string messagePrefix = "Persisted config is invalid.")
+    {
+        var errors = Validate(config, supportedBackplaneKinds, supportedConnectorKinds);
+        if (errors.Count == 0)
+        {
+            return;
+        }
+
+        var detail = string.Join(" ", errors.Values.SelectMany(messages => messages));
+        throw new InvalidOperationException($"{messagePrefix} {detail}".Trim());
+    }
+
+    private static int CalculateVariantCount(ExperimentDefinition experiment)
+    {
+        var hostCount = experiment.HostIds
+            .Where(hostId => !string.IsNullOrWhiteSpace(hostId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var connectorCount = experiment.ConnectorIds
+            .Where(connectorId => !string.IsNullOrWhiteSpace(connectorId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var modelCount = experiment.Models
+            .Where(model => !string.IsNullOrWhiteSpace(model))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .DefaultIfEmpty(string.Empty)
+            .Count();
+
+        return hostCount * connectorCount * modelCount;
     }
 }

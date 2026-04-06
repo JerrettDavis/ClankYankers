@@ -1,6 +1,9 @@
 using ClankYankers.Server.Core.Contracts;
 using ClankYankers.Server.Core.Models;
+using ClankYankers.Server.Features.Config;
+using ClankYankers.Server.Features.Experiments;
 using ClankYankers.Server.Infrastructure.ClaudeHome;
+using ClankYankers.Server.Infrastructure.Registry;
 
 namespace ClankYankers.Server.Features.Sessions;
 
@@ -11,14 +14,19 @@ public static class SessionEndpoints
         group.MapGet("/app-state", async (
             IConfigStore configStore,
             SessionOrchestrator orchestrator,
+            ExperimentOrchestrator experimentOrchestrator,
             ClaudeHomeCatalog claudeHomeCatalog,
+            BackplaneRegistry backplaneRegistry,
+            ConnectorRegistry connectorRegistry,
             CancellationToken cancellationToken) =>
         {
             var config = await configStore.LoadAsync(cancellationToken);
+            ConfigValidator.ThrowIfInvalid(config, backplaneRegistry.Kinds, connectorRegistry.Kinds);
             return Results.Ok(new
             {
                 config,
                 sessions = orchestrator.ListSessions(),
+                experimentRuns = experimentOrchestrator.ListRuns(),
                 claudeHome = claudeHomeCatalog.Load()
             });
         });

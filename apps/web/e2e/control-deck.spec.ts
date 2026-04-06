@@ -90,7 +90,7 @@ test('scaffolds dashboard sections across the studio shell', async ({ page }) =>
   await openSection(page, 'backplanes', 'Backplane registry')
   await openSection(page, 'hosts', 'Launch hosts')
   await openSection(page, 'connectors', 'Connector definitions')
-  await openSection(page, 'lab', 'Run structured experiments')
+  await openSection(page, 'lab', 'Experiment matrix and recent runs')
   await openSection(page, 'agents', 'Local Claude agent catalog')
   await openSection(page, 'skills', 'Local Claude skill catalog')
   await openSection(page, 'mcp', 'Claude MCP and plugin surfaces')
@@ -111,6 +111,28 @@ test('surfaces Claude home catalog and status across studio pages', async ({ pag
   await openSection(page, 'settings', 'Studio settings and operating posture')
   await expect(page.getByRole('heading', { name: 'Local integration status' })).toBeVisible()
   await expect(page.getByText('~/.claude', { exact: true })).toBeVisible()
+})
+
+test('launches a structured experiment run from the lab', async ({ page, request }) => {
+  await openDeck(page)
+
+  await openSection(page, 'lab', 'Experiment matrix and recent runs')
+  await page.getByTestId('run-experiment-local-shell-smoke').first().click()
+  await expect(page.getByText('1/1 active')).toBeVisible()
+
+  let sessions = await listSessions(request)
+  await expect
+    .poll(async () => {
+      sessions = await listSessions(request)
+      return sessions.length
+    }, { timeout: 30_000 })
+    .toBe(1)
+  const [session] = sessions
+
+  await expect(page.getByRole('button', { name: /Open [a-z0-9…-]+/i }).first()).toBeVisible()
+  await page.getByRole('button', { name: /Open [a-z0-9…-]+/i }).first().click()
+  await expect(page.getByRole('heading', { name: 'Terminal work stays first-class' })).toBeVisible()
+  await expect(page.getByTestId(`session-card-${session.id}`)).toBeVisible()
 })
 
 test('persists config changes and discards unsaved edits', async ({ page }) => {

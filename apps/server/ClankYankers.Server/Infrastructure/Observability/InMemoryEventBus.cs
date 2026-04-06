@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace ClankYankers.Server.Infrastructure.Observability;
 
-public sealed class InMemoryEventBus : IEventBus
+public sealed class InMemoryEventBus(ILogger<InMemoryEventBus> logger) : IEventBus
 {
     private readonly ConcurrentDictionary<Type, List<Func<object, CancellationToken, Task>>> _handlers = new();
 
@@ -19,11 +19,11 @@ public sealed class InMemoryEventBus : IEventBus
         }
     }
 
-    public Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken = default)
+    public async Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken = default)
     {
         if (!_handlers.TryGetValue(typeof(TEvent), out var handlers))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         List<Func<object, CancellationToken, Task>> snapshot;
@@ -32,6 +32,16 @@ public sealed class InMemoryEventBus : IEventBus
             snapshot = [.. handlers];
         }
 
-        return Task.WhenAll(snapshot.Select(handler => handler(eventData!, cancellationToken)));
+        foreach (var handler in snapshot)
+        {
+            try
+            {
+                await handler(eventData!, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Event handler failed for {EventType}.", typeof(TEvent).Name);
+            }
+        }
     }
 }
