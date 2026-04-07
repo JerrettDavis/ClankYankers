@@ -39,16 +39,19 @@ ClankYankers is a browser-based orchestration platform that provides a unified t
 git clone https://github.com/JerrettDavis/ClankYankers.git
 cd ClankYankers
 
-# Start the backend server
+# Start the backend server and SPA together in development
 dotnet run --project apps/server/ClankYankers.Server
+```
 
-# In a separate terminal, start the frontend
+`dotnet run` now launches the Vite SPA automatically in development and opens the browser through the ASP.NET Core host. The web UI is served through the SPA proxy at `http://127.0.0.1:5173` and the API server remains available from the ASP.NET Core app at `http://localhost:5023`.
+
+If you want to work on the frontend separately, you can still run it directly:
+
+```bash
 cd apps/web
 npm install
 npm run dev
 ```
-
-The web UI will be available at `http://localhost:5173` and the API server at `http://localhost:5000`.
 
 ### Run the tests
 

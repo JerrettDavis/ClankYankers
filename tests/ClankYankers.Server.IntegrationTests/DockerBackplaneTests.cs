@@ -28,7 +28,7 @@ public sealed class DockerBackplaneTests
                     ? "npipe://./pipe/docker_engine"
                     : "unix:///var/run/docker.sock",
                 DockerImage = "alpine:3.20",
-                WorkingDirectory = "/workspace"
+                WorkingDirectory = "/host-default"
             },
             new LaunchSpec
             {
@@ -36,11 +36,13 @@ public sealed class DockerBackplaneTests
                 DisplayCommand = "/bin/sh",
                 FileName = "/bin/sh",
                 Arguments = [],
+                WorkingDirectory = "/workspace",
                 Cols = 100,
                 Rows = 30
             },
             CancellationToken.None);
 
+        await session.WriteInputAsync("pwd\n", CancellationToken.None);
         await session.WriteInputAsync("echo integration-docker\n", CancellationToken.None);
         await session.WriteInputAsync("exit\n", CancellationToken.None);
 
@@ -49,6 +51,7 @@ public sealed class DockerBackplaneTests
             "integration-docker",
             TimeSpan.FromSeconds(20));
 
+        Assert.Contains("/workspace", output, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("integration-docker", output, StringComparison.OrdinalIgnoreCase);
     }
 }

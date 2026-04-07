@@ -19,7 +19,7 @@ public sealed class ShellConnector : IAgentConnector
             DisplayCommand = string.Join(' ', Enumerable.Repeat(host.ShellExecutable, 1).Concat(host.ShellArguments)),
             FileName = host.ShellExecutable,
             Arguments = host.ShellArguments,
-            WorkingDirectory = host.WorkingDirectory,
+            WorkingDirectory = ConnectorLaunchSupport.ResolveWorkingDirectory(host, request),
             Cols = request.Cols,
             Rows = request.Rows
         };

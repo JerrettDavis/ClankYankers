@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppConfig, ClaudeHomeCatalogResponse } from '../types'
-import { loadClaudeHomeCatalog, runExperiment, saveConfig, stopSession } from './api'
+import { createSession, loadClaudeHomeCatalog, runExperiment, saveConfig, stopSession } from './api'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -125,5 +125,64 @@ describe('api client', () => {
     )
 
     await expect(runExperiment('local-shell-smoke')).resolves.toEqual(run)
+  })
+
+  it('sends working directory overrides when creating a session', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'session-123',
+          experimentId: null,
+          backplaneId: 'local',
+          hostId: 'local-host',
+          connectorId: 'shell',
+          displayCommand: 'pwsh.exe -NoLogo',
+          state: 'Running',
+          createdAt: '2026-04-07T00:00:00Z',
+          startedAt: '2026-04-07T00:00:01Z',
+          endedAt: null,
+          exitCode: null,
+          error: null,
+        }),
+        {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    )
+
+    await createSession({
+      backplaneId: 'local',
+      hostId: 'local-host',
+      connectorId: 'shell',
+      model: null,
+      permissionMode: null,
+      skipPermissions: null,
+      allowedTools: null,
+      agent: null,
+      workingDirectory: 'C:\\git\\ClankYankers',
+      cols: 120,
+      rows: 34,
+    })
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/sessions',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          backplaneId: 'local',
+          hostId: 'local-host',
+          connectorId: 'shell',
+          model: null,
+          permissionMode: null,
+          skipPermissions: null,
+          allowedTools: null,
+          agent: null,
+          workingDirectory: 'C:\\git\\ClankYankers',
+          cols: 120,
+          rows: 34,
+        }),
+      }),
+    )
   })
 })

@@ -132,7 +132,7 @@ test('launches a structured experiment run from the lab', async ({ page, request
   await expect(page.getByRole('button', { name: /Open [a-z0-9…-]+/i }).first()).toBeVisible()
   await page.getByRole('button', { name: /Open [a-z0-9…-]+/i }).first().click()
   await expect(page.getByRole('heading', { name: 'Terminal work stays first-class' })).toBeVisible()
-  await expect(page.getByTestId(`session-card-${session.id}`)).toBeVisible()
+  await expect(page.getByTestId(`workspace-tab-session:${session.id}`)).toBeVisible()
 })
 
 test('persists config changes and discards unsaved edits', async ({ page }) => {
@@ -169,6 +169,7 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
 
   await page.reload()
   await waitForDeck(page)
+  await openLaunchBlade(page)
   await page.getByTestId('launch-connector').selectOption('claude')
   await expect(page.getByTestId('launch-connector-command')).toContainText('claude --verbose')
 
@@ -181,6 +182,7 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
 test('shows connector-specific launch overrides for client CLIs', async ({ page }) => {
   await openDeck(page)
   await openWorkspace(page)
+  await openLaunchBlade(page)
 
   await page.getByTestId('launch-connector').selectOption('claude')
   await expect(page.getByTestId('launch-overrides')).toBeVisible()
@@ -208,12 +210,13 @@ test('runs local shell flows end to end and records audit events', async ({ page
 
     await page.setViewportSize({ width: 1180, height: 820 })
     socket.sendInput("Write-Output 'e2e-local'\r\n")
-    await expect.poll(() => socket.transcript()).toContain('e2e-local')
+    await expect.poll(() => flattenTerminalTranscript(socket.transcript())).toContain('e2e-local')
+    await waitForPromptAfter(socket, 'e2e-local')
 
     await page.setViewportSize({ width: 960, height: 780 })
     socket.sendInput("$name = 'Alice'\r\n")
     socket.sendInput("Write-Output \"done:$name\"\r\n")
-    await expect.poll(() => socket.transcript()).toContain('done:Alice')
+    await expect.poll(() => flattenTerminalTranscript(socket.transcript())).toContain('done:Alice')
 
     socket.sendInput('exit\r\n')
     await expect.poll(async () => (await listSessions(request)).length, { timeout: 30_000 }).toBe(0)
@@ -260,9 +263,9 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
     await expect(page.getByTestId('split-vertical')).toBeDisabled()
     await page.getByRole('button', { name: 'Orchestration' }).click()
     await expect(page.getByTestId(`compare-session-${sessionA}`)).toBeDisabled()
-    await page.getByTestId('nav-section-sessions').click()
+    await openSection(page, 'sessions', 'Browse the active runtime manifest')
     await expect(page.getByRole('button', { name: 'Compare' }).first()).toBeDisabled()
-    await page.getByTestId('nav-section-overview').click()
+    await openSection(page, 'overview', 'One shell, multiple operating surfaces')
     await expect(page.getByRole('button', { name: 'Compare' }).first()).toBeDisabled()
     await openWorkspace(page)
 
@@ -301,9 +304,11 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
 
     await page.getByTestId(`workspace-tab-close-session:${sessionA}`).click()
     await expect(page.getByTestId(`workspace-tab-session:${sessionA}`)).toHaveCount(0)
+    await openLaunchBlade(page)
     await expect(page.getByTestId(`session-card-${sessionA}`)).toBeVisible()
 
     await reopenSessionFromManifest(page, sessionA)
+    await closeLaunchBlade(page)
     await expect(page.getByTestId(`workspace-tab-session:${sessionA}`)).toBeVisible()
     await expect(page.getByTestId(`stop-session-${sessionA}`)).toBeVisible()
 
@@ -329,6 +334,7 @@ test('runs docker shell sessions when docker is available', async ({ page, reque
 
   await openDeck(page)
   await openWorkspace(page)
+  await openLaunchBlade(page)
 
   await page.getByTestId('launch-backplane').selectOption('docker')
   await expect(page.getByTestId('launch-host')).toHaveValue('docker-local')
@@ -356,6 +362,7 @@ test('runs ollama connector sessions when the model is available', async ({ page
 
   await openDeck(page)
   await openWorkspace(page)
+  await openLaunchBlade(page)
 
   await page.getByTestId('launch-connector').selectOption('ollama')
   const sessionId = await launchSession(page, request)
@@ -382,6 +389,11 @@ async function openDeck(page: Page) {
 
 async function waitForDeck(page: Page) {
   await expect(page.locator('.studio-shell')).toBeVisible()
+  if (await page.getByTestId('workspace-studio-nav-toggle').count()) {
+    await expect(page.getByTestId('workspace-studio-nav-toggle')).toBeVisible()
+    return
+  }
+
   await expect(page.getByTestId('nav-section-workspace')).toBeVisible()
 }
 
@@ -390,11 +402,20 @@ async function openWorkspace(page: Page) {
 }
 
 async function openSection(page: Page, section: string, heading: string) {
+  await ensureStudioNavVisible(page)
   await page.getByTestId(`nav-section-${section}`).click()
   await expect(page.getByRole('heading', { name: heading })).toBeVisible()
 }
 
+async function ensureStudioNavVisible(page: Page) {
+  if ((await page.getByTestId('studio-sidebar').getAttribute('aria-hidden')) === 'true') {
+    await page.getByTestId('workspace-studio-nav-toggle').click()
+    await expect(page.getByTestId('studio-sidebar')).toHaveAttribute('aria-hidden', 'false')
+  }
+}
+
 async function openConfigPanel(page: Page) {
+  await openLaunchBlade(page)
   const configPanel = page.getByTestId('config-panel')
   const isOpen = await configPanel.evaluate((element) => (element as HTMLDetailsElement).open)
   if (!isOpen) {
@@ -408,10 +429,11 @@ async function launchSession(
 ): Promise<string> {
   const beforeIds = new Set((await listSessions(request)).map((session) => session.id))
 
+  await openLaunchBlade(page)
   await page.getByTestId('launch-session').click()
 
   const resolvedSessionId = await waitForNewSessionId(request, beforeIds)
-  await expect(page.getByTestId(`session-card-${resolvedSessionId}`)).toBeVisible()
+  await expect(page.getByTestId(`workspace-tab-session:${resolvedSessionId}`)).toBeVisible()
   await expect(page.getByTestId(`terminal-shell-${resolvedSessionId}`)).toBeVisible()
   return resolvedSessionId
 }
@@ -476,12 +498,49 @@ async function waitForNewSessionId(request: APIRequestContext, beforeIds: Set<st
 }
 
 async function reopenSessionFromManifest(page: Page, sessionId: string) {
+  await openLaunchBlade(page)
   const sessionCard = page.getByTestId(`session-card-${sessionId}`)
   await sessionCard.evaluate((element) => {
     element.scrollIntoView({ block: 'center', inline: 'nearest' })
   })
   await sessionCard.focus()
   await page.keyboard.press('Enter')
+}
+
+async function openLaunchBlade(page: Page) {
+  if ((await page.getByTestId('workspace-launch-blade').getAttribute('aria-hidden')) === 'true') {
+    await page.getByTestId('workspace-launch-blade-toggle').click()
+    await expect(page.getByTestId('workspace-launch-blade')).toHaveAttribute('aria-hidden', 'false')
+  }
+}
+
+async function closeLaunchBlade(page: Page) {
+  if ((await page.getByTestId('workspace-launch-blade').getAttribute('aria-hidden')) === 'false') {
+    await page.getByLabel('Close launch blade').click()
+    await expect(page.getByTestId('workspace-launch-blade')).toHaveAttribute('aria-hidden', 'true')
+  }
+}
+
+async function waitForPromptAfter(socket: SessionSocket, marker: string) {
+  await expect
+    .poll(() => {
+      const transcript = socket.transcript()
+      const markerIndex = transcript.lastIndexOf(marker)
+      if (markerIndex === -1) {
+        return false
+      }
+
+      return /[\r\n]>\s/.test(transcript.slice(markerIndex))
+    }, { timeout: 30_000 })
+    .toBe(true)
+}
+
+function flattenTerminalTranscript(transcript: string) {
+  return transcript
+    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, '')
+    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\u0007/g, '')
+    .replace(/\r?\n/g, '')
 }
 
 
