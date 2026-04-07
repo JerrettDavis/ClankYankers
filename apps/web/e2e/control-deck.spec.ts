@@ -537,9 +537,9 @@ async function waitForPromptAfter(socket: SessionSocket, marker: string) {
 
 function flattenTerminalTranscript(transcript: string) {
   return transcript
-    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, '')
-    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
-    .replace(/\u0007/g, '')
+    .replace(terminalOscSequencePattern, '')
+    .replace(terminalCsiSequencePattern, '')
+    .replace(terminalBellPattern, '')
     .replace(/\r?\n/g, '')
 }
 
@@ -554,6 +554,10 @@ interface SessionSocket {
   sendInput: (data: string) => void
   transcript: () => string
 }
+
+const terminalOscSequencePattern = new RegExp(String.raw`\u001B\][^\u0007]*(?:\u0007|\u001B\\)`, 'g')
+const terminalCsiSequencePattern = new RegExp(String.raw`\u001B\[[0-?]*[ -/]*[@-~]`, 'g')
+const terminalBellPattern = new RegExp(String.raw`\u0007`, 'g')
 
 async function attachSessionSocket(sessionId: string): Promise<SessionSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:5023/ws/session/${sessionId}`)
