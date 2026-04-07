@@ -13,7 +13,7 @@ const config: AppConfig = {
       displayName: 'This machine',
       shellExecutable: 'pwsh.exe',
       shellArguments: ['-NoLogo'],
-      workingDirectory: null,
+      workingDirectory: 'C:\\git\\ClankYankers',
       dockerEndpoint: null,
       dockerImage: null,
       enabled: true,
@@ -47,5 +47,27 @@ describe('config helpers', () => {
     expect(draft.backplaneId).toBe('local')
     expect(draft.hostId).toBe('local-host')
     expect(draft.connectorId).toBe('claude')
+  })
+
+  it('keeps host working directories inherited until the user edits them', () => {
+    const draft = coerceLaunchDraft(config)
+
+    expect(draft.model).toBeNull()
+    expect(draft.permissionMode).toBeNull()
+    expect(draft.allowedTools).toBeNull()
+    expect(draft.agent).toBeNull()
+    expect(draft.workingDirectory).toBeNull()
+
+    const updatedConfig: AppConfig = {
+      ...config,
+      hosts: config.hosts.map((host) =>
+        host.id === 'local-host' ? { ...host, workingDirectory: 'D:\\repos\\ClankYankers' } : host,
+      ),
+    }
+
+    const refreshedDraft = coerceLaunchDraft(updatedConfig, draft)
+
+    expect(refreshedDraft.workingDirectory).toBeNull()
+    expect(refreshedDraft.permissionMode).toBeNull()
   })
 })

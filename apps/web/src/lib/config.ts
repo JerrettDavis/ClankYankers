@@ -13,6 +13,11 @@ export interface LaunchDraft {
   hostId: string
   connectorId: string
   model: string | null
+  permissionMode: string | null
+  skipPermissions: boolean | null
+  allowedTools: string[] | null
+  agent: string | null
+  workingDirectory: string | null
   cols: number
   rows: number
 }
@@ -54,6 +59,10 @@ export function getConnector(config: AppConfig, connectorId: string): ConnectorD
   return config.connectors.find((connector) => sameId(connector.id, connectorId))
 }
 
+export function getHost(config: AppConfig, hostId: string): HostConfig | undefined {
+  return config.hosts.find((host) => sameId(host.id, hostId))
+}
+
 export function coerceLaunchDraft(config: AppConfig, current?: Partial<LaunchDraft>): LaunchDraft {
   const backplane = pickValue(
     getEnabledBackplanes(config).map((item) => item.id),
@@ -69,13 +78,17 @@ export function coerceLaunchDraft(config: AppConfig, current?: Partial<LaunchDra
     getEnabledConnectors(config).map((item) => item.id),
     current?.connectorId,
   )
-  const connectorDefinition = getConnector(config, connector)
 
   return {
     backplaneId: backplane,
     hostId: host,
     connectorId: connector,
-    model: pickText(current?.model, connectorDefinition?.defaultModel),
+    model: pickText(current?.model, null),
+    permissionMode: pickText(current?.permissionMode, null),
+    skipPermissions: pickToggle(current?.skipPermissions),
+    allowedTools: normalizeList(current?.allowedTools),
+    agent: pickText(current?.agent, null),
+    workingDirectory: pickText(current?.workingDirectory, null),
     cols: clampDimension(current?.cols, 120),
     rows: clampDimension(current?.rows, 34),
   }
@@ -182,6 +195,21 @@ function pickText(current: string | null | undefined, fallback: string | null | 
   }
 
   return null
+}
+
+function pickToggle(current: boolean | null | undefined): boolean | null {
+  return typeof current === 'boolean' ? current : null
+}
+
+function normalizeList(current: string[] | null | undefined): string[] | null {
+  if (!current) {
+    return null
+  }
+
+  return current
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, values) => values.findIndex((candidate) => candidate.localeCompare(item, undefined, { sensitivity: 'accent' }) === 0) === index)
 }
 
 function uniqueId(prefix: string): string {

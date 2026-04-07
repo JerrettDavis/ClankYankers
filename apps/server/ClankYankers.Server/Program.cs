@@ -50,6 +50,13 @@ builder.Services.AddSingleton<SessionOrchestrator>();
 builder.Services.AddSingleton<ExperimentOrchestrator>();
 
 var app = builder.Build();
+var spaIndexPath = Path.Combine(app.Environment.WebRootPath ?? string.Empty, "index.html");
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 
 app.UseCors();
 app.UseWebSockets();
@@ -66,8 +73,28 @@ if (app.Environment.IsDevelopment())
 }
 ClaudeHomeEndpoints.Map(api);
 
-app.MapGet("/", () => Results.Ok(new { name = "ClankYankers.Server" }));
 app.Map("/ws/session/{sessionId}", SessionWebSocketHandler.HandleAsync);
+
+if (!app.Environment.IsDevelopment())
+{
+    app.MapFallback(async context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/ws"))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        if (!File.Exists(spaIndexPath))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(spaIndexPath);
+    });
+}
 
 app.Run();
 

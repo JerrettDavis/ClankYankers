@@ -234,6 +234,7 @@ const mcpBlueprints: BlueprintCard[] = [
 function App() {
   const themeMode = useSystemTheme()
   const compactWorkspace = useCompactWorkspace()
+  const activeSection = useStudioSection()
   const [savedConfig, setSavedConfig] = useState<AppConfig | null>(null)
   const [configDraft, setConfigDraft] = useState<AppConfig | null>(null)
   const [claudeHome, setClaudeHome] = useState<ClaudeHomeSummary | null>(null)
@@ -245,10 +246,17 @@ function App() {
     hostId: '',
     connectorId: '',
     model: null,
+    permissionMode: null,
+    skipPermissions: null,
+    allowedTools: null,
+    agent: null,
+    workingDirectory: null,
     cols: 120,
     rows: 34,
   })
   const [workspace, setWorkspace] = useState(() => createInitialWorkspace([]))
+  const [isWorkspaceBladeOpen, setIsWorkspaceBladeOpen] = useState(false)
+  const [isWorkspaceStudioNavOpen, setIsWorkspaceStudioNavOpen] = useState(() => shouldStartWorkspaceStudioNavOpen())
   const [isBooting, setIsBooting] = useState(true)
   const [isCreatingSession, setIsCreatingSession] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
@@ -258,7 +266,6 @@ function App() {
   const [statusMessage, setStatusMessage] = useState<string>('Control deck ready.')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [configDirty, setConfigDirty] = useState(false)
-  const activeSection = useStudioSection()
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -305,7 +312,8 @@ function App() {
       setExperimentRuns(nextState.experimentRuns)
       setClaudeHome(nextState.claudeHome)
 
-      if (activeSection === 'agents' || activeSection === 'skills') {
+      const nextWorkspaceConnector = getConnector(nextState.config, launchDraft.connectorId) ?? null
+      if (shouldLoadClaudeCatalogForSection(activeSection, nextState.claudeHome?.exists, nextWorkspaceConnector)) {
         setClaudeCatalog(nextState.claudeHome?.exists ? await loadClaudeHomeCatalog() : null)
       }
     } catch (error) {
@@ -313,14 +321,15 @@ function App() {
     } finally {
       setIsRefreshing(false)
     }
-  }, [activeSection])
+  }, [activeSection, launchDraft.connectorId])
 
   useEffect(() => {
     void loadWorkspace()
   }, [loadWorkspace])
 
   useEffect(() => {
-    if (!claudeHome?.exists || (activeSection !== 'agents' && activeSection !== 'skills') || claudeCatalog) {
+    const workspaceConnector = savedConfig ? getConnector(savedConfig, launchDraft.connectorId) ?? null : null
+    if (!shouldLoadClaudeCatalogForSection(activeSection, claudeHome?.exists, workspaceConnector) || claudeCatalog) {
       return
     }
 
@@ -342,7 +351,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [activeSection, claudeCatalog, claudeHome?.exists])
+  }, [activeSection, claudeCatalog, claudeHome?.exists, launchDraft.connectorId, savedConfig])
 
   useEffect(() => {
     if (!savedConfig) {
@@ -363,6 +372,16 @@ function App() {
 
     setWorkspace((current) => (current.layout === 'single' ? current : setWorkspaceLayout(current, 'single')))
   }, [compactWorkspace])
+
+  useEffect(() => {
+    if (activeSection !== 'workspace') {
+      setIsWorkspaceStudioNavOpen(true)
+      return
+    }
+
+    setIsWorkspaceStudioNavOpen(false)
+    setIsWorkspaceBladeOpen(false)
+  }, [activeSection])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -422,6 +441,25 @@ function App() {
         })
       }
 
+      if (key === 'backplaneId') {
+        const nextBackplaneId = String(value)
+        const nextHostId = getEnabledHosts(savedConfig, nextBackplaneId)[0]?.id
+        return coerceLaunchDraft(savedConfig, {
+          ...current,
+          backplaneId: nextBackplaneId,
+          hostId: nextHostId,
+          workingDirectory: undefined,
+        })
+      }
+
+      if (key === 'hostId') {
+        return coerceLaunchDraft(savedConfig, {
+          ...current,
+          hostId: String(value),
+          workingDirectory: undefined,
+        })
+      }
+
       return coerceLaunchDraft(savedConfig, {
         ...current,
         [key]: value,
@@ -452,6 +490,7 @@ function App() {
       const createdSession = await createSession(launchDraft)
       setSessions((current) => [createdSession, ...current])
       setWorkspace((current) => openSessionTab(current, createdSession))
+      setIsWorkspaceBladeOpen(false)
       setStatusMessage(`Session ${formatWorkspaceLabel(createdSession.id)} is live.`)
     } catch (error) {
       setErrorMessage(asMessage(error))
@@ -781,6 +820,20 @@ function App() {
     mcp: claudeMcpArtifactCount || claudeSettings?.enabledPluginCount || mcpBlueprints.length,
     settings: configDirty ? 'draft' : 'stable',
   }
+  const isWorkspaceSection = activeSection === 'workspace'
+  const isWorkspaceFocusMode = isWorkspaceSection && !isWorkspaceStudioNavOpen
+  const handleToggleWorkspaceBlade = (open: boolean) => {
+    setIsWorkspaceBladeOpen(open)
+    if (open) {
+      setIsWorkspaceStudioNavOpen(false)
+    }
+  }
+  const handleToggleWorkspaceStudioNav = (open: boolean) => {
+    setIsWorkspaceStudioNavOpen(open)
+    if (open) {
+      setIsWorkspaceBladeOpen(false)
+    }
+  }
   const openStudioSection = (section: StudioSection) => {
     setStudioSectionHash(section)
   }
@@ -806,11 +859,14 @@ function App() {
           activeTab={activeTab}
           availableHosts={availableHosts}
           canSplitWorkspace={canSplitWorkspace}
+          claudeCatalog={claudeCatalog}
+          claudeHome={claudeHome}
           compactWorkspace={compactWorkspace}
           configDraft={configDraft}
           enabledBackplanes={enabledBackplanes}
           enabledConnectors={enabledConnectors}
           isCreatingSession={isCreatingSession}
+          isLaunchBladeOpen={isWorkspaceBladeOpen}
           isSavingConfig={isSavingConfig}
           isStoppingSession={isStoppingSession}
           launchDraft={launchDraft}
@@ -824,9 +880,9 @@ function App() {
           onSessionMessage={handleSessionMessage}
           onSetWorkspaceLayout={handleSetWorkspaceLayout}
           onStopSession={handleStopSession}
+          onToggleLaunchBlade={handleToggleWorkspaceBlade}
           onUpdateConfigDraft={updateConfigDraft}
           onUpdateLaunchDraft={updateLaunchDraft}
-          savedConfig={savedConfig}
           secondarySession={secondarySession}
           secondaryTab={secondaryTab}
           selectedConnector={selectedConnector}
@@ -1179,8 +1235,15 @@ function App() {
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      <div className="studio-shell">
-        <aside className="studio-sidebar">
+      <div
+        className={`studio-shell${isWorkspaceSection ? ' studio-shell--workspace' : ''}${isWorkspaceFocusMode ? ' studio-shell--workspace-focus' : ''}${isWorkspaceSection && isWorkspaceStudioNavOpen ? ' studio-shell--workspace-nav-open' : ''}`}
+      >
+        <aside
+          aria-hidden={isWorkspaceSection ? !isWorkspaceStudioNavOpen : undefined}
+          className="studio-sidebar"
+          data-testid="studio-sidebar"
+          inert={isWorkspaceSection ? !isWorkspaceStudioNavOpen : undefined}
+        >
           <div className="studio-sidebar__brand">
             <p className="eyebrow">Local orchestration studio</p>
             <h1>ClankYankers</h1>
@@ -1216,8 +1279,19 @@ function App() {
           </nav>
         </aside>
 
-        <div className="studio-main">
-          <header className="masthead masthead--studio">
+        {isWorkspaceSection ? (
+          <button
+            aria-hidden={!isWorkspaceStudioNavOpen}
+            aria-label="Close studio nav"
+            className={`studio-shell__scrim${isWorkspaceStudioNavOpen ? ' is-visible' : ''}`}
+            onClick={() => handleToggleWorkspaceStudioNav(false)}
+            tabIndex={isWorkspaceStudioNavOpen ? 0 : -1}
+            type="button"
+          />
+        ) : null}
+
+        <div className={`studio-main${isWorkspaceSection ? ' studio-main--workspace' : ''}`}>
+          <header className={`masthead masthead--studio${isWorkspaceFocusMode ? ' masthead--workspace-focus' : ''}`}>
             <div className="masthead__brand">
               <p className="eyebrow">{activeSectionMeta.eyebrow}</p>
               <div className="masthead__title">
@@ -1241,14 +1315,24 @@ function App() {
                 </div>
               </div>
               <div className="header-actions">
-              <button
-                className="button button--ghost"
-                data-testid="refresh-sessions"
-                onClick={() => void handleRefreshAction()}
-                type="button"
-              >
-                {isRefreshing ? 'Refreshing…' : refreshActionLabel}
-              </button>
+                {isWorkspaceSection ? (
+                  <button
+                    className="button button--ghost"
+                    data-testid="workspace-studio-nav-toggle"
+                    onClick={() => handleToggleWorkspaceStudioNav(!isWorkspaceStudioNavOpen)}
+                    type="button"
+                  >
+                    {isWorkspaceStudioNavOpen ? 'Hide studio nav' : 'Show studio nav'}
+                  </button>
+                ) : null}
+                <button
+                  className="button button--ghost"
+                  data-testid="refresh-sessions"
+                  onClick={() => void handleRefreshAction()}
+                  type="button"
+                >
+                  {isRefreshing ? 'Refreshing…' : refreshActionLabel}
+                </button>
                 {showConfigActions ? (
                   <>
                     <button
@@ -1281,7 +1365,10 @@ function App() {
             </div>
           ) : null}
 
-          <main className="product-main" id="main-content">
+          <main
+            className={`product-main${isWorkspaceSection ? ' product-main--workspace' : ''}${isWorkspaceFocusMode ? ' product-main--workspace-focus' : ''}`}
+            id="main-content"
+          >
             {currentPage}
           </main>
         </div>
@@ -1482,11 +1569,14 @@ interface WorkspacePageProps {
   activeTab: WorkspaceTab | null
   availableHosts: HostConfig[]
   canSplitWorkspace: boolean
+  claudeCatalog: ClaudeHomeCatalogResponse | null
+  claudeHome: ClaudeHomeSummary | null
   compactWorkspace: boolean
   configDraft: AppConfig
   enabledBackplanes: BackplaneDefinition[]
   enabledConnectors: ConnectorDefinition[]
   isCreatingSession: boolean
+  isLaunchBladeOpen: boolean
   isSavingConfig: boolean
   isStoppingSession: boolean
   launchDraft: LaunchDraft
@@ -1500,9 +1590,9 @@ interface WorkspacePageProps {
   onSessionMessage: (sessionId: string, message: TerminalServerMessage) => void
   onSetWorkspaceLayout: (layout: WorkspaceLayout) => void
   onStopSession: (sessionId: string) => void
+  onToggleLaunchBlade: (open: boolean) => void
   onUpdateConfigDraft: (updater: (current: AppConfig) => AppConfig) => void
   onUpdateLaunchDraft: <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) => void
-  savedConfig: AppConfig
   secondarySession: SessionSummary | null
   secondaryTab: WorkspaceTab | null
   selectedConnector: ConnectorDefinition | null
@@ -1522,11 +1612,14 @@ function WorkspacePage({
   activeTab,
   availableHosts,
   canSplitWorkspace,
+  claudeCatalog,
+  claudeHome,
   compactWorkspace,
   configDraft,
   enabledBackplanes,
   enabledConnectors,
   isCreatingSession,
+  isLaunchBladeOpen,
   isSavingConfig,
   isStoppingSession,
   launchDraft,
@@ -1540,6 +1633,7 @@ function WorkspacePage({
   onSessionMessage,
   onSetWorkspaceLayout,
   onStopSession,
+  onToggleLaunchBlade,
   onUpdateConfigDraft,
   onUpdateLaunchDraft,
   secondarySession,
@@ -1553,8 +1647,8 @@ function WorkspacePage({
 }: WorkspacePageProps) {
   return (
     <div className="product-page product-page--workspace" data-testid="product-page-workspace">
-      <section className="page-stack">
-        <div className="page-intro">
+      <section className="page-stack page-stack--workspace">
+        <div className="page-intro page-intro--workspace">
           <div>
             <p className="eyebrow">Command studio</p>
             <h2>Terminal work stays first-class</h2>
@@ -1565,90 +1659,9 @@ function WorkspacePage({
           <MetricStrip items={sessionMetrics} />
         </div>
 
-        <div className={`workspace workspace--product${activeSession ? ' workspace--active' : ''}`}>
-          <aside className="rail">
-            <LaunchPanel
-              availableHosts={availableHosts}
-              enabledBackplanes={enabledBackplanes}
-              enabledConnectors={enabledConnectors}
-              isCreatingSession={isCreatingSession}
-              launchDraft={launchDraft}
-              onLaunchSession={onLaunchSession}
-              onUpdateLaunchDraft={onUpdateLaunchDraft}
-              selectedConnector={selectedConnector}
-            />
-
-            <QuickConfigPanel
-              configDraft={configDraft}
-              isSavingConfig={isSavingConfig}
-              onAddBackplane={() =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  backplanes: [...current.backplanes, createBackplaneDefinition()],
-                }))
-              }
-              onAddConnector={() =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  connectors: [...current.connectors, createConnectorDefinition()],
-                }))
-              }
-              onAddHost={() =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  hosts: [
-                    ...current.hosts,
-                    createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
-                  ],
-                }))
-              }
-              onBackplaneChange={(index, nextValue) =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  backplanes: updateItem(current.backplanes, index, nextValue),
-                }))
-              }
-              onBackplaneRemove={(index) =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
-                }))
-              }
-              onConnectorChange={(index, nextValue) =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  connectors: updateItem(current.connectors, index, nextValue),
-                }))
-              }
-              onConnectorRemove={(index) =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
-                }))
-              }
-              onHostChange={(index, nextValue) =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  hosts: updateItem(current.hosts, index, nextValue),
-                }))
-              }
-              onHostRemove={(index) =>
-                onUpdateConfigDraft((current) => ({
-                  ...current,
-                  hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
-                }))
-              }
-              onResetDraft={onResetDraft}
-              onSaveConfig={onSaveConfig}
-            />
-
-            <SessionManifestPanel
-              activeSessionId={activeSession?.id ?? null}
-              onOpenSession={onOpenSession}
-              sessions={sessions}
-            />
-          </aside>
-
+        <div
+          className={`workspace workspace--product${activeSession ? ' workspace--active' : ''}${isLaunchBladeOpen ? ' workspace--blade-open' : ''}`}
+        >
           <section className={`stage${activeSession ? ' stage--active' : ' stage--idle'}`}>
             <div className="stage__header">
               <div>
@@ -1664,6 +1677,14 @@ function WorkspacePage({
               </div>
 
               <div className="stage__actions">
+                <button
+                  className="button button--ghost"
+                  data-testid="workspace-launch-blade-toggle"
+                  onClick={() => onToggleLaunchBlade(!isLaunchBladeOpen)}
+                  type="button"
+                >
+                  {isLaunchBladeOpen ? 'Hide launch blade' : 'New session'}
+                </button>
                 <button className="button button--ghost" onClick={onOpenOrchestration} type="button">
                   Orchestration
                 </button>
@@ -1771,6 +1792,107 @@ function WorkspacePage({
               </div>
             </div>
           </section>
+
+          <button
+            className={`workspace__scrim${isLaunchBladeOpen ? ' is-visible' : ''}`}
+            aria-label="Close launch blade"
+            aria-hidden={!isLaunchBladeOpen}
+            onClick={() => onToggleLaunchBlade(false)}
+            tabIndex={isLaunchBladeOpen ? 0 : -1}
+            type="button"
+          />
+
+          <aside
+            className={`rail-blade${isLaunchBladeOpen ? ' rail-blade--open' : ''}`}
+            aria-hidden={!isLaunchBladeOpen}
+            data-testid="workspace-launch-blade"
+          >
+            <div className="rail">
+              <LaunchPanel
+                availableHosts={availableHosts}
+                claudeCatalog={claudeCatalog}
+                claudeHome={claudeHome}
+                enabledBackplanes={enabledBackplanes}
+                enabledConnectors={enabledConnectors}
+                isCreatingSession={isCreatingSession}
+                launchDraft={launchDraft}
+                onClose={() => onToggleLaunchBlade(false)}
+                onLaunchSession={onLaunchSession}
+                onUpdateLaunchDraft={onUpdateLaunchDraft}
+                selectedConnector={selectedConnector}
+              />
+
+              <QuickConfigPanel
+                configDraft={configDraft}
+                isSavingConfig={isSavingConfig}
+                onAddBackplane={() =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    backplanes: [...current.backplanes, createBackplaneDefinition()],
+                  }))
+                }
+                onAddConnector={() =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    connectors: [...current.connectors, createConnectorDefinition()],
+                  }))
+                }
+                onAddHost={() =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    hosts: [
+                      ...current.hosts,
+                      createHostConfig(current.backplanes[0]?.id ?? current.hosts[0]?.backplaneId ?? 'local'),
+                    ],
+                  }))
+                }
+                onBackplaneChange={(index, nextValue) =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    backplanes: updateItem(current.backplanes, index, nextValue),
+                  }))
+                }
+                onBackplaneRemove={(index) =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    backplanes: current.backplanes.filter((_, itemIndex) => itemIndex !== index),
+                  }))
+                }
+                onConnectorChange={(index, nextValue) =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    connectors: updateItem(current.connectors, index, nextValue),
+                  }))
+                }
+                onConnectorRemove={(index) =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    connectors: current.connectors.filter((_, itemIndex) => itemIndex !== index),
+                  }))
+                }
+                onHostChange={(index, nextValue) =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    hosts: updateItem(current.hosts, index, nextValue),
+                  }))
+                }
+                onHostRemove={(index) =>
+                  onUpdateConfigDraft((current) => ({
+                    ...current,
+                    hosts: current.hosts.filter((_, itemIndex) => itemIndex !== index),
+                  }))
+                }
+                onResetDraft={onResetDraft}
+                onSaveConfig={onSaveConfig}
+              />
+
+              <SessionManifestPanel
+                activeSessionId={activeSession?.id ?? null}
+                onOpenSession={onOpenSession}
+                sessions={sessions}
+              />
+            </div>
+          </aside>
         </div>
       </section>
     </div>
@@ -1779,10 +1901,13 @@ function WorkspacePage({
 
 interface LaunchPanelProps {
   availableHosts: HostConfig[]
+  claudeCatalog: ClaudeHomeCatalogResponse | null
+  claudeHome: ClaudeHomeSummary | null
   enabledBackplanes: BackplaneDefinition[]
   enabledConnectors: ConnectorDefinition[]
   isCreatingSession: boolean
   launchDraft: LaunchDraft
+  onClose: () => void
   onLaunchSession: (event: FormEvent<HTMLFormElement>) => void
   onUpdateLaunchDraft: <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) => void
   selectedConnector: ConnectorDefinition | null
@@ -1790,14 +1915,73 @@ interface LaunchPanelProps {
 
 function LaunchPanel({
   availableHosts,
+  claudeCatalog,
+  claudeHome,
   enabledBackplanes,
   enabledConnectors,
   isCreatingSession,
   launchDraft,
+  onClose,
   onLaunchSession,
   onUpdateLaunchDraft,
   selectedConnector,
 }: LaunchPanelProps) {
+  const selectedHost = availableHosts.find((host) => host.id === launchDraft.hostId) ?? null
+  const launchCapabilities = getConnectorLaunchCapabilities(selectedConnector)
+  const effectiveModel = launchDraft.model ?? selectedConnector?.defaultModel ?? ''
+  const effectivePermissionMode = launchDraft.permissionMode ?? selectedConnector?.defaultPermissionMode ?? ''
+  const effectiveSkipPermissions = launchDraft.skipPermissions ?? selectedConnector?.skipPermissions ?? false
+  const effectiveAllowedTools = launchDraft.allowedTools ?? selectedConnector?.allowedTools ?? []
+  const knownAllowedToolOptions = getKnownAllowedToolOptions(selectedConnector)
+  const selectedKnownAllowedTools = effectiveAllowedTools.filter((tool) =>
+    knownAllowedToolOptions.some((option) => sameLaunchValue(option, tool)),
+  )
+  const customAllowedTools = effectiveAllowedTools.filter(
+    (tool) => !knownAllowedToolOptions.some((option) => sameLaunchValue(option, tool)),
+  )
+  const claudeAgents = [...(claudeCatalog?.agents ?? [])].sort((left, right) => left.name.localeCompare(right.name))
+  const claudeAgentCount = claudeHome?.agentCount ?? 0
+  const visibleWorkingDirectory = launchDraft.workingDirectory ?? selectedHost?.workingDirectory ?? ''
+  const workspaceFolderHint = selectedHost?.workingDirectory
+    ? `Host default: ${selectedHost.workingDirectory}. Clear edits to restore it.`
+    : 'Uses the selected host default when available, otherwise the runtime process default.'
+  const permissionModeHint = effectiveSkipPermissions
+    ? 'Dangerously skip permissions is enabled, so Claude will bypass permission mode for this launch.'
+    : launchDraft.permissionMode === null
+      ? `Using connector default: ${selectedConnector?.defaultPermissionMode ?? 'Claude default'}.`
+      : `Session override applied: ${formatPermissionMode(effectivePermissionMode)}.`
+  const skipPermissionsHint =
+    launchDraft.skipPermissions === null
+      ? `Using connector default: ${selectedConnector?.skipPermissions ? 'enabled' : 'disabled'}.`
+      : 'Session override applied for dangerous skip permissions.'
+  const allowedToolsHint =
+    launchDraft.allowedTools === null
+      ? selectedConnector?.allowedTools.length
+        ? `Using connector default: ${formatAllowedToolSummary(selectedConnector.allowedTools)}.`
+        : 'No connector allowlist configured. Select tools here only when this session needs pre-approved actions.'
+      : effectiveAllowedTools.length > 0
+        ? `${effectiveAllowedTools.length} allow rule${effectiveAllowedTools.length === 1 ? '' : 's'} selected for this launch.`
+        : 'This launch will prompt for tools unless permissions are bypassed.'
+  const agentHint = !claudeHome?.exists
+    ? 'No Claude home directory detected for agent discovery.'
+    : claudeAgentCount === 0
+      ? 'No Claude agents were discovered in ~/.claude/agents.'
+      : claudeCatalog
+        ? 'Apply a Claude agent at session start for specialized prompts and tool rules.'
+        : 'Loading discovered Claude agents…'
+
+  const handleAllowedToolToggle = (tool: string, checked: boolean) => {
+    const remainder = effectiveAllowedTools.filter((candidate) => !sameLaunchValue(candidate, tool))
+    const nextAllowedTools = checked ? dedupeLaunchValues([...remainder, tool]) : remainder
+    onUpdateLaunchDraft('allowedTools', nextAllowedTools)
+  }
+
+  const handleCustomAllowedToolsChange = (value: string) => {
+    const nextCustomTools = parseArgumentList(value)
+    const nextAllowedTools = dedupeLaunchValues([...selectedKnownAllowedTools, ...nextCustomTools])
+    onUpdateLaunchDraft('allowedTools', nextAllowedTools)
+  }
+
   return (
     <section className="panel panel--launch">
       <div className="panel__header">
@@ -1805,6 +1989,9 @@ function LaunchPanel({
           <p className="eyebrow">Session launch</p>
           <h2>New session</h2>
         </div>
+        <button className="button button--ghost button--compact" onClick={onClose} type="button">
+          Hide
+        </button>
       </div>
 
       <form className="launch-form" data-testid="launch-form" onSubmit={onLaunchSession}>
@@ -1860,23 +2047,152 @@ function LaunchPanel({
               <p data-testid="launch-connector-command">{formatConnectorLaunchTarget(selectedConnector)}</p>
             </div>
 
-            {selectedConnector.kind.toLowerCase() !== 'shell' ? (
+            {launchCapabilities.supportsModel ||
+            launchCapabilities.supportsPermissionMode ||
+            launchCapabilities.supportsAllowedTools ||
+            launchCapabilities.supportsSkipPermissions ||
+            launchCapabilities.supportsAgent ? (
               <div className="launch-overrides" data-testid="launch-overrides">
-                <label className="field">
-                  <span>Model override</span>
-                  <input
-                    data-testid="launch-model"
-                    placeholder={selectedConnector.defaultModel ?? 'Use connector default'}
-                    value={launchDraft.model ?? ''}
-                    onChange={(event) => onUpdateLaunchDraft('model', event.target.value.trim() || null)}
-                  />
-                </label>
+                {launchCapabilities.supportsModel ? (
+                  <label className="field">
+                    <span>Model override</span>
+                    <input
+                      data-testid="launch-model"
+                      placeholder={selectedConnector.defaultModel ?? 'Use connector default'}
+                      value={launchDraft.model ?? ''}
+                      onChange={(event) => onUpdateLaunchDraft('model', event.target.value.trim() || null)}
+                    />
+                    <p className="field-note">
+                      {launchDraft.model === null
+                        ? `Using connector default: ${selectedConnector.defaultModel ?? 'provider default'}.`
+                        : `Session override applied: ${effectiveModel}.`}
+                    </p>
+                  </label>
+                ) : null}
+
+                {launchCapabilities.supportsPermissionMode ? (
+                  <label className="field">
+                    <span>Permission mode</span>
+                    <select
+                      data-testid="launch-permission-mode"
+                      value={launchDraft.permissionMode ?? ''}
+                      disabled={effectiveSkipPermissions}
+                      onChange={(event) => onUpdateLaunchDraft('permissionMode', event.target.value || null)}
+                    >
+                      <option value="">Use connector default</option>
+                      {permissionModes.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {formatPermissionMode(mode)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="field-note">{permissionModeHint}</p>
+                  </label>
+                ) : null}
+
+                {launchCapabilities.supportsAgent ? (
+                  <label className="field">
+                    <span>Agent</span>
+                    <select
+                      data-testid="launch-agent"
+                      value={launchDraft.agent ?? ''}
+                      disabled={Boolean(claudeHome?.exists) && claudeAgentCount > 0 && !claudeCatalog}
+                      onChange={(event) => onUpdateLaunchDraft('agent', event.target.value || null)}
+                    >
+                      <option value="">No agent</option>
+                      {claudeAgents.map((agent) => (
+                        <option key={agent.name} value={agent.name}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="field-note">{agentHint}</p>
+                  </label>
+                ) : null}
+
+                {launchCapabilities.supportsSkipPermissions ? (
+                  <div className="field field--toggle-card">
+                    <div className="field__header">
+                      <span>Dangerously skip permissions</span>
+                      <button
+                        className="button button--ghost button--inline"
+                        disabled={launchDraft.skipPermissions === null}
+                        onClick={() => onUpdateLaunchDraft('skipPermissions', null)}
+                        type="button"
+                      >
+                        Use connector default
+                      </button>
+                    </div>
+                    <label className="toggle toggle--card">
+                      <input
+                        data-testid="launch-skip-permissions"
+                        type="checkbox"
+                        checked={effectiveSkipPermissions}
+                        onChange={(event) => onUpdateLaunchDraft('skipPermissions', event.target.checked)}
+                      />
+                      <span>Let Claude bypass permission prompts for this session.</span>
+                    </label>
+                    <p className="field-note">{skipPermissionsHint}</p>
+                  </div>
+                ) : null}
+
+                {launchCapabilities.supportsAllowedTools ? (
+                  <div className="field field--tool-palette">
+                    <div className="field__header">
+                      <span>Allowed tools</span>
+                      <button
+                        className="button button--ghost button--inline"
+                        disabled={launchDraft.allowedTools === null}
+                        onClick={() => onUpdateLaunchDraft('allowedTools', null)}
+                        type="button"
+                      >
+                        Use connector default
+                      </button>
+                    </div>
+                    <div className="tool-chip-grid" data-testid="launch-allowed-tools">
+                      {knownAllowedToolOptions.map((tool) => {
+                        const isSelected = effectiveAllowedTools.some((candidate) => sameLaunchValue(candidate, tool))
+                        return (
+                          <label className={`tool-chip${isSelected ? ' is-selected' : ''}`} key={tool}>
+                            <input
+                              checked={isSelected}
+                              onChange={(event) => handleAllowedToolToggle(tool, event.target.checked)}
+                              type="checkbox"
+                            />
+                            <span>{tool}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <label className="field field--nested">
+                      <span>Custom allow rules</span>
+                      <input
+                        data-testid="launch-custom-tools"
+                        placeholder="Bash(git status), Read"
+                        value={customAllowedTools.join(', ')}
+                        onChange={(event) => handleCustomAllowedToolsChange(event.target.value)}
+                      />
+                    </label>
+                    <p className="field-note">{allowedToolsHint}</p>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="field-note">Uses the selected host shell.</p>
             )}
           </>
         ) : null}
+
+        <label className="field">
+          <span>Workspace folder</span>
+          <input
+            data-testid="launch-working-directory"
+            placeholder="Use host default"
+            value={visibleWorkingDirectory}
+            onChange={(event) => onUpdateLaunchDraft('workingDirectory', event.target.value || null)}
+          />
+          <p className="field-note">{workspaceFolderHint}</p>
+        </label>
 
         <div className="dimension-grid">
           <label className="field">
@@ -3102,12 +3418,27 @@ function formatWorkspaceLayout(layout: WorkspaceLayout): string {
 
 function getConnectorLaunchDefaults(connector?: ConnectorDefinition | null): Pick<
   LaunchDraft,
-  'model'
+  'agent' | 'allowedTools' | 'model' | 'permissionMode' | 'skipPermissions'
 > {
+  void connector
   return {
-    model: connector?.defaultModel ?? null,
+    model: null,
+    permissionMode: null,
+    skipPermissions: null,
+    allowedTools: null,
+    agent: null,
   }
 }
+
+interface ConnectorLaunchCapabilities {
+  supportsAgent: boolean
+  supportsAllowedTools: boolean
+  supportsModel: boolean
+  supportsPermissionMode: boolean
+  supportsSkipPermissions: boolean
+}
+
+const claudeAllowedToolOptions = ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Bash', 'Task', 'WebFetch', 'TodoWrite']
 
 function formatConnectorLaunchTarget(connector: ConnectorDefinition): string {
   if (connector.kind.toLowerCase() === 'shell') {
@@ -3132,6 +3463,75 @@ function formatWorkspaceLabel(value: string): string {
 }
 
 const permissionModes = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']
+
+function getConnectorLaunchCapabilities(connector?: ConnectorDefinition | null): ConnectorLaunchCapabilities {
+  const kind = connector?.kind.trim().toLowerCase()
+  return {
+    supportsAgent: kind === 'claude',
+    supportsAllowedTools: kind === 'claude',
+    supportsModel: Boolean(connector && kind !== 'shell'),
+    supportsPermissionMode: kind === 'claude',
+    supportsSkipPermissions: kind === 'claude',
+  }
+}
+
+function getKnownAllowedToolOptions(connector?: ConnectorDefinition | null): string[] {
+  if (connector?.kind.trim().toLowerCase() !== 'claude') {
+    return []
+  }
+
+  return dedupeLaunchValues([...claudeAllowedToolOptions, ...connector.allowedTools])
+}
+
+function dedupeLaunchValues(values: string[]): string[] {
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value, index, items) => items.findIndex((candidate) => sameLaunchValue(candidate, value)) === index)
+}
+
+function sameLaunchValue(left: string, right: string): boolean {
+  return left.localeCompare(right, undefined, { sensitivity: 'accent' }) === 0
+}
+
+function formatPermissionMode(value: string): string {
+  switch (value) {
+    case 'acceptEdits':
+      return 'acceptEdits'
+    case 'bypassPermissions':
+      return 'bypassPermissions'
+    default:
+      return value
+  }
+}
+
+function formatAllowedToolSummary(values: string[]): string {
+  if (values.length === 0) {
+    return 'no pre-approved tools'
+  }
+
+  if (values.length <= 3) {
+    return values.join(', ')
+  }
+
+  return `${values.slice(0, 3).join(', ')} +${values.length - 3} more`
+}
+
+function shouldLoadClaudeCatalogForSection(
+  section: StudioSection,
+  claudeHomeExists: boolean | undefined,
+  connector?: ConnectorDefinition | null,
+): boolean {
+  if (!claudeHomeExists) {
+    return false
+  }
+
+  return (
+    section === 'agents' ||
+    section === 'skills' ||
+    (section === 'workspace' && connector?.kind.trim().toLowerCase() === 'claude')
+  )
+}
 
 function useSystemTheme(): ThemeMode {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readSystemTheme())
@@ -3224,7 +3624,12 @@ function useStudioSection(): StudioSection {
     }
 
     if (!window.location.hash) {
-      window.history.replaceState(null, '', createStudioSectionHref(defaultStudioSection))
+      const initialSection = readStudioSection()
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}${createStudioSectionHref(initialSection)}`,
+      )
     }
 
     const syncSection = () => {
@@ -3240,14 +3645,22 @@ function useStudioSection(): StudioSection {
   return section
 }
 
+function shouldStartWorkspaceStudioNavOpen(): boolean {
+  return readStudioSection() !== 'workspace'
+}
+
 function readStudioSection(): StudioSection {
   if (typeof window === 'undefined') {
     return defaultStudioSection
   }
 
   const hash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase()
-  const section = hash as StudioSection
+  const section = (hash || readStudioSectionFromPath(window.location.pathname)) as StudioSection
   return Object.hasOwn(studioSectionMeta, section) ? section : defaultStudioSection
+}
+
+function readStudioSectionFromPath(pathname: string): string {
+  return pathname.replace(/^\/+/, '').split('/')[0]?.trim().toLowerCase() ?? ''
 }
 
 function createStudioSectionHref(section: StudioSection): string {

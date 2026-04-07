@@ -4,11 +4,40 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <SpaRoot>..\..\web\</SpaRoot>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(SpaRoot)node_modules\**</DefaultItemExcludes>
+    <SpaProxyServerUrl>http://127.0.0.1:5173</SpaProxyServerUrl>
+    <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.4" />
     <PackageReference Include="PTY" Version="1.0.3" />
   </ItemGroup>
+
+  <Target Name="EnsureNodeDependencies" BeforeTargets="Build" Condition="'$(Configuration)' == 'Debug' and Exists('$(SpaRoot)package.json') and !Exists('$(SpaRoot)node_modules')">
+    <Exec Command="node --version" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeVersionExitCode" />
+    </Exec>
+    <Error Condition="'$(NodeVersionExitCode)' != '0'" Text="Node.js is required to run the ClankYankers SPA. Install Node.js from https://nodejs.org/ and restart the shell." />
+    <Message Importance="high" Text="Restoring SPA dependencies with npm install..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
+  </Target>
+
+  <Target Name="PublishSpaAssets" AfterTargets="ComputeFilesToPublish" Condition="Exists('$(SpaRoot)package.json')">
+    <Message Importance="high" Text="Building SPA assets for publish..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build" />
+
+    <ItemGroup>
+      <DistFiles Include="$(SpaRoot)dist\**" />
+      <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>wwwroot\%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>

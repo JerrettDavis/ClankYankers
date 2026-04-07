@@ -127,6 +127,11 @@ export interface CreateSessionRequest {
   hostId: string
   connectorId: string
   model: string | null
+  permissionMode: string | null
+  skipPermissions: boolean | null
+  allowedTools: string[] | null
+  agent: string | null
+  workingDirectory: string | null
   cols: number
   rows: number
 }

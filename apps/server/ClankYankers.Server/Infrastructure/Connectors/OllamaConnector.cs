@@ -26,7 +26,7 @@ public sealed class OllamaConnector : IAgentConnector
             DisplayCommand = ConnectorLaunchSupport.BuildDisplayCommand(fileName, arguments),
             FileName = fileName,
             Arguments = arguments,
-            WorkingDirectory = host.WorkingDirectory,
+            WorkingDirectory = ConnectorLaunchSupport.ResolveWorkingDirectory(host, request),
             Cols = request.Cols,
             Rows = request.Rows
         };
