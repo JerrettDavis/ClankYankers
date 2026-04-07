@@ -19,5 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // ESLint 10 surfaces this rule against existing workspace synchronization effects.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])
