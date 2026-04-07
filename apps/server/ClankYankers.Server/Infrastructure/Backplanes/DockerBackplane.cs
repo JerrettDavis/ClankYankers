@@ -40,7 +40,7 @@ public sealed class DockerBackplane(ILogger<DockerBackplane> logger) : IBackplan
             AttachStdout = true,
             AttachStderr = true,
             StdinOnce = false,
-            WorkingDir = host.WorkingDirectory,
+            WorkingDir = launchSpec.WorkingDirectory,
             Cmd = [launchSpec.FileName, .. launchSpec.Arguments]
         }, cancellationToken);
 

@@ -57,7 +57,7 @@ public sealed class SessionOrchestratorTests
             new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
             LoggerFactory.Create(_ => { }));
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var error = await Assert.ThrowsAsync<SessionRequestResolutionException>(() =>
             orchestrator.CreateAsync(
                 new CreateSessionRequest
                 {
@@ -195,6 +195,111 @@ public sealed class SessionOrchestratorTests
 
         Assert.NotNull(backplane.LastLaunchSpec);
         Assert.Equal("pwsh.exe", backplane.LastLaunchSpec!.FileName);
+    }
+
+    [Fact]
+    public async Task CreateAsync_uses_request_working_directory_override_when_provided()
+    {
+        var overrideDirectory = Path.Combine(Path.GetTempPath(), $"clanky-workspace-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(overrideDirectory);
+
+        var config = CreateLocalShellConfig() with
+        {
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "local-host",
+                    BackplaneId = "local",
+                    DisplayName = "This machine",
+                    ShellExecutable = "pwsh.exe",
+                    ShellArguments = ["-NoLogo"],
+                    WorkingDirectory = null
+                }
+            ]
+        };
+        var backplane = new FakeBackplane("local");
+        var orchestrator = new SessionOrchestrator(
+            new FakeConfigStore(config),
+            new BackplaneRegistry([backplane]),
+            new ConnectorRegistry([new ShellConnector()]),
+            new SessionRegistry(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
+            LoggerFactory.Create(_ => { }));
+
+        try
+        {
+            await orchestrator.CreateAsync(
+                new CreateSessionRequest
+                {
+                    BackplaneId = "local",
+                    HostId = "local-host",
+                    ConnectorId = "shell",
+                    WorkingDirectory = overrideDirectory,
+                    Cols = 120,
+                    Rows = 34
+                },
+                CancellationToken.None);
+
+            Assert.NotNull(backplane.LastLaunchSpec);
+            Assert.Equal(overrideDirectory, backplane.LastLaunchSpec!.WorkingDirectory);
+        }
+        finally
+        {
+            Directory.Delete(overrideDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CreateAsync_inherits_the_host_working_directory_when_no_override_is_provided()
+    {
+        var hostDirectory = Path.Combine(Path.GetTempPath(), $"clanky-host-workspace-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(hostDirectory);
+
+        var config = CreateLocalShellConfig() with
+        {
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "local-host",
+                    BackplaneId = "local",
+                    DisplayName = "This machine",
+                    ShellExecutable = "pwsh.exe",
+                    ShellArguments = ["-NoLogo"],
+                    WorkingDirectory = hostDirectory
+                }
+            ]
+        };
+        var backplane = new FakeBackplane("local");
+        var orchestrator = new SessionOrchestrator(
+            new FakeConfigStore(config),
+            new BackplaneRegistry([backplane]),
+            new ConnectorRegistry([new ShellConnector()]),
+            new SessionRegistry(),
+            new InMemoryEventBus(LoggerFactory.Create(_ => { }).CreateLogger<InMemoryEventBus>()),
+            LoggerFactory.Create(_ => { }));
+
+        try
+        {
+            await orchestrator.CreateAsync(
+                new CreateSessionRequest
+                {
+                    BackplaneId = "local",
+                    HostId = "local-host",
+                    ConnectorId = "shell",
+                    Cols = 120,
+                    Rows = 34
+                },
+                CancellationToken.None);
+
+            Assert.NotNull(backplane.LastLaunchSpec);
+            Assert.Equal(hostDirectory, backplane.LastLaunchSpec!.WorkingDirectory);
+        }
+        finally
+        {
+            Directory.Delete(hostDirectory, recursive: true);
+        }
     }
 
     [Fact]

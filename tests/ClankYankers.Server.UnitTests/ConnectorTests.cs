@@ -162,11 +162,55 @@ public sealed class ConnectorTests
                 DisplayName = "Claude Code",
                 Kind = "claude",
                 LaunchCommand = "claude",
-                LaunchArguments = ["--verbose", "--model", "haiku", "--dangerously-skip-permissions", "--permission-mode", "acceptEdits", "--allowedTools", "Read"],
+                LaunchArguments = ["--verbose", "--model=haiku", "--dangerously-skip-permissions", "--permission-mode", "acceptEdits", "--allowedTools=Read", "--agent=frontend-developer"],
                 DefaultPermissionMode = "plan"
             });
 
         Assert.Equal(["--verbose", "--model", "sonnet-4.6", "--permission-mode", "plan"], launchSpec.Arguments);
         Assert.Equal("claude --verbose --model sonnet-4.6 --permission-mode plan", launchSpec.DisplayCommand);
+    }
+
+    [Fact]
+    public void ClaudeConnector_applies_session_level_permission_tool_and_agent_overrides()
+    {
+        var connector = new ClaudeConnector();
+
+        var launchSpec = connector.BuildLaunchSpec(
+            "session-claude",
+            new CreateSessionRequest
+            {
+                Cols = 120,
+                Rows = 40,
+                Model = "opus-4.6",
+                PermissionMode = "acceptEdits",
+                SkipPermissions = false,
+                AllowedTools = ["Read", "Bash(git status)", "Read"],
+                Agent = "frontend-developer"
+            },
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe"
+            },
+            new ConnectorDefinition
+            {
+                Id = "claude",
+                DisplayName = "Claude Code",
+                Kind = "claude",
+                LaunchCommand = "claude",
+                LaunchArguments = ["--verbose"],
+                DefaultPermissionMode = "plan",
+                AllowedTools = ["Edit"],
+                SkipPermissions = true
+            });
+
+        Assert.Equal(
+            ["--verbose", "--model", "opus-4.6", "--agent", "frontend-developer", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Bash(git status)"],
+            launchSpec.Arguments);
+        Assert.Equal(
+            "claude --verbose --model opus-4.6 --agent frontend-developer --permission-mode acceptEdits --allowedTools Read,Bash(git status)",
+            launchSpec.DisplayCommand);
     }
 }

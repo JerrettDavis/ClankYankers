@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -33,6 +33,16 @@ jobs:
 
       - name: Build
         run: dotnet build ClankYankers.slnx --configuration Release --no-restore /p:ContinuousIntegrationBuild=true
+
+      - name: Install Playwright browsers for acceptance tests
+        run: |
+          PLAYWRIGHT_SCRIPT="$(find tests/ClankYankers.Studio.AcceptanceTests/bin/Release -name playwright.ps1 -print -quit)"
+          if [ -z "$PLAYWRIGHT_SCRIPT" ]; then
+            echo "playwright.ps1 was not generated during build." >&2
+            exit 1
+          fi
+
+          pwsh "$PLAYWRIGHT_SCRIPT" install --with-deps chromium
 
       - name: Clean stale test results
         run: find . -path "*/TestResults" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -66,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

@@ -10,14 +10,16 @@ public sealed class ClaudeConnector : IAgentConnector
         "--model",
         "--permission-mode",
         "--dangerously-skip-permissions",
-        "--allowedTools"
+        "--allowedTools",
+        "--agent"
     };
 
     private static readonly HashSet<string> ReservedArgumentsWithValues = new(StringComparer.OrdinalIgnoreCase)
     {
         "--model",
         "--permission-mode",
-        "--allowedTools"
+        "--allowedTools",
+        "--agent"
     };
 
     public string Kind => "claude";
@@ -32,16 +34,17 @@ public sealed class ClaudeConnector : IAgentConnector
         var arguments = SanitizeBaseArguments(definition).ToList();
 
         ConnectorLaunchSupport.AppendOption(arguments, "--model", ConnectorLaunchSupport.ResolveModel(definition, request));
-        if (ConnectorLaunchSupport.ResolveSkipPermissions(definition))
+        ConnectorLaunchSupport.AppendOption(arguments, "--agent", ConnectorLaunchSupport.ResolveAgent(request));
+        if (ConnectorLaunchSupport.ResolveSkipPermissions(definition, request))
         {
             arguments.Add("--dangerously-skip-permissions");
         }
         else
         {
-            ConnectorLaunchSupport.AppendOption(arguments, "--permission-mode", ConnectorLaunchSupport.ResolvePermissionMode(definition));
+            ConnectorLaunchSupport.AppendOption(arguments, "--permission-mode", ConnectorLaunchSupport.ResolvePermissionMode(definition, request));
         }
 
-        var allowedTools = ConnectorLaunchSupport.ResolveAllowedTools(definition);
+        var allowedTools = ConnectorLaunchSupport.ResolveAllowedTools(definition, request);
         if (allowedTools.Count > 0)
         {
             arguments.Add("--allowedTools");
@@ -54,7 +57,7 @@ public sealed class ClaudeConnector : IAgentConnector
             DisplayCommand = ConnectorLaunchSupport.BuildDisplayCommand(fileName, arguments),
             FileName = fileName,
             Arguments = arguments,
-            WorkingDirectory = host.WorkingDirectory,
+            WorkingDirectory = ConnectorLaunchSupport.ResolveWorkingDirectory(host, request),
             Cols = request.Cols,
             Rows = request.Rows
         };
@@ -72,16 +75,38 @@ public sealed class ClaudeConnector : IAgentConnector
                 continue;
             }
 
-            if (!ReservedArguments.Contains(argument))
+            if (!TryMatchReservedArgument(argument, out var expectsValue))
             {
                 yield return argument;
                 continue;
             }
 
-            if (ReservedArgumentsWithValues.Contains(argument))
+            if (expectsValue && !argument.Contains('=', StringComparison.Ordinal))
             {
                 skipNext = true;
             }
         }
+    }
+
+    private static bool TryMatchReservedArgument(string argument, out bool expectsValue)
+    {
+        var trimmed = argument.Trim();
+        foreach (var reserved in ReservedArguments)
+        {
+            if (trimmed.Equals(reserved, StringComparison.OrdinalIgnoreCase))
+            {
+                expectsValue = ReservedArgumentsWithValues.Contains(reserved);
+                return true;
+            }
+
+            if (trimmed.StartsWith($"{reserved}=", StringComparison.OrdinalIgnoreCase))
+            {
+                expectsValue = false;
+                return true;
+            }
+        }
+
+        expectsValue = false;
+        return false;
     }
 }

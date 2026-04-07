@@ -7,7 +7,7 @@ public static class ConfigValidator
     public const int MaxExperimentVariantCount = 24;
 
     private static readonly string[] ReservedClaudeArguments =
-        ["--model", "--permission-mode", "--dangerously-skip-permissions", "--allowedTools"];
+        ["--model", "--permission-mode", "--dangerously-skip-permissions", "--allowedTools", "--agent"];
 
     public static IDictionary<string, string[]> Validate(
         AppConfig config,
@@ -225,7 +225,7 @@ public static class ConfigValidator
         var claudeConnectorsWithReservedArguments = config.Connectors
             .Where(connector => connector.Enabled
                 && connector.Kind.Equals("claude", StringComparison.OrdinalIgnoreCase)
-                && connector.LaunchArguments.Any(argument => ReservedClaudeArguments.Contains(argument, StringComparer.OrdinalIgnoreCase)))
+                && connector.LaunchArguments.Any(IsReservedClaudeArgument))
             .Select(connector => string.IsNullOrWhiteSpace(connector.Id) ? "<blank-id>" : connector.Id)
             .ToArray();
 
@@ -374,6 +374,14 @@ public static class ConfigValidator
         }
 
         return errors;
+    }
+
+    private static bool IsReservedClaudeArgument(string argument)
+    {
+        var trimmed = argument.Trim();
+        return ReservedClaudeArguments.Any(reserved =>
+            trimmed.Equals(reserved, StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith($"{reserved}=", StringComparison.OrdinalIgnoreCase));
     }
 
     public static void ThrowIfInvalid(

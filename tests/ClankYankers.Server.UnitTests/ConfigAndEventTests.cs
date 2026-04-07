@@ -129,6 +129,99 @@ public sealed class ConfigAndEventTests
     }
 
     [Fact]
+    public void SessionRequestValidator_rejects_relative_local_working_directories_after_resolution()
+    {
+        var errors = SessionRequestValidator.ValidateResolved(
+            new BackplaneDefinition
+            {
+                Id = "local",
+                DisplayName = "Local",
+                Kind = "local"
+            },
+            new LaunchSpec
+            {
+                SessionId = "session-1",
+                DisplayCommand = "pwsh.exe",
+                FileName = "pwsh.exe",
+                WorkingDirectory = "relative-path",
+                Cols = 120,
+                Rows = 34
+            });
+
+        Assert.Equal(["Local workspace folder must be an absolute path."], errors["workingDirectory"]);
+    }
+
+    [Fact]
+    public void SessionRequestValidator_rejects_missing_local_working_directories_after_resolution()
+    {
+        var missingDirectory = Path.Combine(Path.GetTempPath(), $"clanky-missing-{Guid.NewGuid():N}");
+        var errors = SessionRequestValidator.ValidateResolved(
+            new BackplaneDefinition
+            {
+                Id = "local",
+                DisplayName = "Local",
+                Kind = "local"
+            },
+            new LaunchSpec
+            {
+                SessionId = "session-1",
+                DisplayCommand = "pwsh.exe",
+                FileName = "pwsh.exe",
+                WorkingDirectory = missingDirectory,
+                Cols = 120,
+                Rows = 34
+            });
+
+        Assert.Equal([$"Local workspace folder '{missingDirectory}' does not exist."], errors["workingDirectory"]);
+    }
+
+    [Fact]
+    public void SessionRequestValidator_rejects_relative_docker_working_directories_after_resolution()
+    {
+        var errors = SessionRequestValidator.ValidateResolved(
+            new BackplaneDefinition
+            {
+                Id = "docker",
+                DisplayName = "Docker",
+                Kind = "docker"
+            },
+            new LaunchSpec
+            {
+                SessionId = "session-1",
+                DisplayCommand = "/bin/sh",
+                FileName = "/bin/sh",
+                WorkingDirectory = "workspace",
+                Cols = 120,
+                Rows = 34
+            });
+
+        Assert.Equal(["Docker workspace folder must be an absolute path such as /workspace."], errors["workingDirectory"]);
+    }
+
+    [Fact]
+    public void SessionRequestValidator_rejects_windows_style_docker_working_directories_after_resolution()
+    {
+        var errors = SessionRequestValidator.ValidateResolved(
+            new BackplaneDefinition
+            {
+                Id = "docker",
+                DisplayName = "Docker",
+                Kind = "docker"
+            },
+            new LaunchSpec
+            {
+                SessionId = "session-1",
+                DisplayCommand = "/bin/sh",
+                FileName = "/bin/sh",
+                WorkingDirectory = @"C:\workspace",
+                Cols = 120,
+                Rows = 34
+            });
+
+        Assert.Equal(["Docker workspace folder must be an absolute path such as /workspace."], errors["workingDirectory"]);
+    }
+
+    [Fact]
     public void ConfigValidator_requires_an_enabled_launch_path()
     {
         var defaults = AppConfig.CreateDefault();
@@ -196,7 +289,7 @@ public sealed class ConfigAndEventTests
                     Id = "",
                     DisplayName = "",
                     Kind = "claude",
-                    LaunchArguments = ["--model", "sonnet-4.6"],
+                    LaunchArguments = ["--model=sonnet-4.6", "--agent", "frontend-developer"],
                     Enabled = true
                 }
             ]
