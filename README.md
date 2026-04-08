@@ -25,6 +25,27 @@ ClankYankers is a browser-based orchestration platform that provides a unified t
 
 ---
 
+## Screenshots
+
+> Screenshots are captured automatically by the Reqnroll acceptance suite and refreshed on a weekly schedule. See [`tests/ClankYankers.Studio.AcceptanceTests`](tests/ClankYankers.Studio.AcceptanceTests) and the [screenshots workflow](.github/workflows/screenshots.yml).
+
+### Overview — light mode (desktop)
+![Overview light desktop](docs/assets/bdd/ui-overview-desktop-light.png)
+
+### Overview — dark mode (desktop)
+![Overview dark desktop](docs/assets/bdd/ui-overview-desktop-dark.png)
+
+### Sessions — light mode (desktop)
+![Sessions light desktop](docs/assets/bdd/ui-sessions-desktop-light.png)
+
+### Overview — mobile (390 × 844)
+
+| Light | Dark |
+|-------|------|
+| ![Overview mobile light](docs/assets/bdd/ui-overview-mobile-light.png) | ![Overview mobile dark](docs/assets/bdd/ui-overview-mobile-dark.png) |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
