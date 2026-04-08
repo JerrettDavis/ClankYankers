@@ -4,9 +4,7 @@
   block-size: 100vh;
   block-size: 100dvh;
   inline-size: 100%;
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--paper-1) 76%, transparent), transparent 18%),
-    linear-gradient(90deg, color-mix(in oklab, var(--accent-0) 4%, transparent), transparent 28%);
+  background: var(--paper-0);
 }
 
 .studio-shell--workspace {
@@ -33,14 +31,12 @@
 .studio-sidebar {
   min-block-size: 0;
   overflow: auto;
-  padding: 0.95rem 0.8rem;
+  padding: 1rem 0.75rem;
   border-right: 1px solid color-mix(in oklab, var(--line-soft) 86%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--surface-card) 94%, transparent), transparent 42%),
-    color-mix(in oklab, var(--paper-1) 90%, var(--paper-0));
+  background: color-mix(in oklab, var(--paper-1) 96%, var(--paper-0));
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .studio-shell--workspace .studio-sidebar {
@@ -72,10 +68,12 @@
 
 .studio-sidebar__brand {
   display: grid;
-  gap: 0.35rem;
-  padding: 0.8rem;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
   border: 1px solid color-mix(in oklab, var(--line-soft) 86%, transparent);
-  background: color-mix(in oklab, var(--surface-card) 92%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-sm);
 }
 
 .studio-sidebar__brand h1 {
@@ -92,6 +90,7 @@
 
 .studio-sidebar__metrics .metric-strip {
   grid-template-columns: 1fr;
+  gap: 0.5rem;
 }
 
 .studio-nav {
@@ -123,21 +122,24 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.72rem 0.8rem;
-  border: 1px solid color-mix(in oklab, var(--line-soft) 90%, transparent);
-  background: color-mix(in oklab, var(--surface-card) 88%, transparent);
-  color: inherit;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-1);
   text-decoration: none;
+  font-size: 0.9rem;
   transition:
     border-color 160ms ease,
     background-color 160ms ease,
-    transform 160ms ease;
+    color 160ms ease;
 }
 
 .studio-nav__item:hover {
-  border-color: color-mix(in oklab, var(--accent-0) 20%, var(--line-soft));
-  background: color-mix(in oklab, var(--accent-ghost) 52%, var(--surface-card));
-  transform: translateX(1px);
+  border-color: color-mix(in oklab, var(--line-soft) 88%, transparent);
+  background: color-mix(in oklab, var(--surface-card) 72%, transparent);
+  color: var(--ink-0);
+  transform: none;
 }
 
 .studio-nav__item strong {
@@ -150,7 +152,9 @@
 
 .studio-nav__item.is-active {
   border-color: color-mix(in oklab, var(--accent-0) 28%, var(--line-strong));
-  background: color-mix(in oklab, var(--accent-ghost) 76%, var(--surface-card));
+  background: color-mix(in oklab, var(--accent-ghost) 64%, var(--surface-card));
+  color: var(--ink-0);
+  font-weight: 600;
 }
 
 .studio-main {
@@ -163,11 +167,9 @@
 
 .masthead--studio {
   margin: 0;
-  padding: 0.85rem 1rem;
+  padding: 0.9rem 1.25rem;
   border-bottom: 1px solid color-mix(in oklab, var(--line-soft) 86%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--surface-float) 95%, transparent), transparent 100%),
-    color-mix(in oklab, var(--paper-0) 95%, transparent);
+  background: color-mix(in oklab, var(--paper-0) 97%, transparent);
 }
 
 .masthead--workspace-focus {
@@ -208,7 +210,7 @@
 .product-main {
   min-block-size: 0;
   overflow: auto;
-  padding: var(--shell-pad);
+  padding: clamp(1rem, 1.5vw, 1.5rem);
 }
 
 .product-main--workspace {
@@ -231,7 +233,7 @@
 
 .page-stack {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
   min-inline-size: 0;
 }
 
@@ -328,18 +330,20 @@
 .metric-tile {
   display: grid;
   gap: 0.25rem;
-  padding: 0.8rem 0.9rem;
+  padding: 0.9rem 1rem;
   border: 1px solid color-mix(in oklab, var(--line-soft) 88%, transparent);
-  background: color-mix(in oklab, var(--surface-float) 96%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-sm);
 }
 
 .metric-tile__label,
 .catalog-card__eyebrow,
 .quick-link__eyebrow {
-  color: var(--accent-emphasis);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  color: var(--ink-2);
+  font-size: 0.67rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -423,15 +427,26 @@
 .catalog-card,
 .overview-session-item {
   border: 1px solid color-mix(in oklab, var(--line-soft) 88%, transparent);
-  background: color-mix(in oklab, var(--surface-card) 94%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
 }
 
 .quick-link {
   display: grid;
   gap: 0.35rem;
-  padding: 0.9rem;
+  padding: 1rem;
   color: inherit;
   text-align: left;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.quick-link:hover {
+  border-color: color-mix(in oklab, var(--accent-0) 28%, var(--line-soft));
+  background: color-mix(in oklab, var(--accent-ghost) 48%, var(--surface-card));
+  box-shadow: var(--shadow-sm);
 }
 
 .quick-link p {
@@ -447,7 +462,11 @@
 .catalog-card {
   display: grid;
   gap: 0.45rem;
-  padding: 0.9rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 .catalog-card p {
@@ -471,7 +490,11 @@
   display: flex;
   justify-content: space-between;
   gap: 0.8rem;
-  padding: 0.9rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 .overview-session-item p {
@@ -538,6 +561,12 @@
   box-shadow: var(--shadow-sm);
 }
 
+.product-page--overview .panel,
+.product-page--inventory .panel,
+.product-page--settings .panel {
+  border-radius: var(--radius-lg);
+}
+
 @media (max-width: 1100px) {
   .studio-shell {
     grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr);
@@ -569,14 +598,13 @@
     max-block-size: 10.75rem;
     border-right: 0;
     border-bottom: 1px solid color-mix(in oklab, var(--line-soft) 86%, transparent);
-    padding: 0.7rem;
-    gap: 0.6rem;
+    padding: 0.75rem;
+    gap: 0.65rem;
   }
 
   .studio-sidebar__brand {
-    padding: 0;
-    border: 0;
-    background: transparent;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
     gap: 0.18rem;
   }
 
@@ -606,15 +634,15 @@
   }
 
   .masthead--studio {
-    padding-inline: 0.85rem;
+    padding-inline: 1rem;
   }
 
   .product-main {
-    padding: 0.85rem;
+    padding: 1rem;
   }
 
   .product-main--workspace {
-    padding: 0.7rem;
+    padding: 0.75rem;
   }
 
   .studio-shell--workspace .studio-sidebar {
@@ -642,7 +670,7 @@
   .studio-sidebar {
     max-block-size: min(8.25rem, 24vh);
     max-block-size: min(8.25rem, 24dvh);
-    padding: 0.55rem 0.65rem;
+    padding: 0.6rem 0.75rem;
     gap: 0.5rem;
   }
 
@@ -653,7 +681,7 @@
   }
 
   .studio-sidebar__brand h1 {
-    font-size: 1.42rem;
+    font-size: 1.2rem;
   }
 
   .studio-nav {
@@ -667,17 +695,19 @@
 
   .studio-nav__items {
     display: flex;
-    gap: 0.45rem;
+    gap: 0.4rem;
   }
 
   .studio-nav__item {
     flex: 0 0 auto;
-    min-inline-size: 8.5rem;
+    min-inline-size: 7.5rem;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.84rem;
   }
 
   .masthead--studio {
-    padding: 0.55rem 0.7rem;
-    gap: 0.38rem;
+    padding: 0.65rem 0.85rem;
+    gap: 0.45rem;
   }
 
   .masthead--workspace-focus {
@@ -689,11 +719,7 @@
   }
 
   .masthead--studio .status-chip {
-    padding: 0.38rem 0.5rem;
-  }
-
-  .masthead--studio .status-chip__label {
-    display: none;
+    padding: 0.38rem 0.55rem;
   }
 
   .masthead--studio .button {
@@ -706,11 +732,11 @@
   .catalog-card,
   .quick-link,
   .overview-session-item {
-    padding: 0.75rem;
+    padding: 0.8rem;
   }
 
   .studio-nav__item {
-    padding: 0.62rem 0.7rem;
+    padding: 0.55rem 0.7rem;
   }
 
   .workspace--product {
