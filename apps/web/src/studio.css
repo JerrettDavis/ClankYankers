@@ -720,8 +720,8 @@
   }
 
   .masthead--studio {
-    padding: 0.65rem 0.85rem;
-    gap: 0.45rem;
+    padding: 0.55rem 0.8rem;
+    gap: 0.35rem;
   }
 
   .masthead--workspace-focus {
@@ -733,7 +733,7 @@
   }
 
   .masthead--studio .status-chip {
-    padding: 0.38rem 0.5rem;
+    padding: 0.34rem 0.46rem;
   }
 
   .masthead--studio .button {
