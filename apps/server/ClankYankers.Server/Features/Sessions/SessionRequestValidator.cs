@@ -76,7 +76,7 @@ public static class SessionRequestValidator
         return errors;
     }
 
-    public static IDictionary<string, string[]> ValidateResolved(BackplaneDefinition backplane, LaunchSpec launchSpec)
+    public static IDictionary<string, string[]> ValidateResolved(BackplaneDefinition backplane, HostConfig host, LaunchSpec launchSpec)
     {
         var errors = new Dictionary<string, string[]>();
 
@@ -100,14 +100,18 @@ public static class SessionRequestValidator
             return errors;
         }
 
-        if (backplane.Kind.Equals("docker", StringComparison.OrdinalIgnoreCase) &&
-            !IsAbsoluteContainerPath(workingDirectory))
+        if (RequiresContainerPathValidation(backplane, host) && !IsAbsoluteContainerPath(workingDirectory))
         {
             errors["workingDirectory"] = ["Docker workspace folder must be an absolute path such as /workspace."];
         }
 
         return errors;
     }
+
+    private static bool RequiresContainerPathValidation(BackplaneDefinition backplane, HostConfig host) =>
+        backplane.Kind.Equals("docker", StringComparison.OrdinalIgnoreCase)
+        || (backplane.Kind.Equals("remote", StringComparison.OrdinalIgnoreCase)
+            && host.RemoteExecutorKind?.Equals("docker", StringComparison.OrdinalIgnoreCase) == true);
 
     private static bool IsAbsoluteContainerPath(string workingDirectory) =>
         workingDirectory.StartsWith("/", StringComparison.Ordinal);

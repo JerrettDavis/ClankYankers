@@ -12,6 +12,18 @@
       "displayName": "Docker",
       "kind": "docker",
       "enabled": true
+    },
+    {
+      "id": "ssh",
+      "displayName": "SSH",
+      "kind": "ssh",
+      "enabled": false
+    },
+    {
+      "id": "remote",
+      "displayName": "Remote daemon",
+      "kind": "remote",
+      "enabled": false
     }
   ],
   "hosts": [
@@ -38,6 +50,62 @@
       "dockerEndpoint": "npipe://./pipe/docker_engine",
       "dockerImage": "alpine:3.20",
       "enabled": true
+    },
+    {
+      "id": "ssh-example",
+      "backplaneId": "ssh",
+      "displayName": "Example SSH host",
+      "shellExecutable": "/bin/bash",
+      "shellArguments": [],
+      "workingDirectory": "/workspace",
+      "dockerEndpoint": null,
+      "dockerImage": null,
+      "sshAddress": "ssh.example.internal",
+      "sshPort": 22,
+      "sshUsername": "operator",
+      "sshPassword": null,
+      "sshPrivateKeyPath": "~/.ssh/id_ed25519",
+      "sshPrivateKeyPassphrase": null,
+      "sshCertificatePath": null,
+      "sshHostKeyFingerprint": "SHA256:replace-me",
+      "sshTrustedCaFingerprint": null,
+      "sshAllowAnyHostKey": false,
+      "sshUseKeyboardInteractive": false,
+      "remoteDaemonUrl": null,
+      "remoteAccessToken": null,
+      "remoteAllowInsecureTls": false,
+      "remoteExecutorKind": null,
+      "remoteDockerEndpoint": null,
+      "remoteDockerImage": null,
+      "enabled": false
+    },
+    {
+      "id": "remote-example",
+      "backplaneId": "remote",
+      "displayName": "Example remote daemon",
+      "shellExecutable": "/bin/bash",
+      "shellArguments": [],
+      "workingDirectory": "/workspace",
+      "dockerEndpoint": null,
+      "dockerImage": null,
+      "sshAddress": null,
+      "sshPort": null,
+      "sshUsername": null,
+      "sshPassword": null,
+      "sshPrivateKeyPath": null,
+      "sshPrivateKeyPassphrase": null,
+      "sshCertificatePath": null,
+      "sshHostKeyFingerprint": null,
+      "sshTrustedCaFingerprint": null,
+      "sshAllowAnyHostKey": false,
+      "sshUseKeyboardInteractive": false,
+      "remoteDaemonUrl": "https://remote-node.example.internal:7331",
+      "remoteAccessToken": null,
+      "remoteAllowInsecureTls": false,
+      "remoteExecutorKind": "process",
+      "remoteDockerEndpoint": null,
+      "remoteDockerImage": null,
+      "enabled": false
     }
   ],
   "connectors": [

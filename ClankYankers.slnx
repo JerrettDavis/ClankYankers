@@ -1,7 +1,13 @@
 <Solution>
   <Folder Name="/apps/" />
+  <Folder Name="/apps/daemon/">
+    <Project Path="apps/daemon/ClankYankers.Daemon/ClankYankers.Daemon.csproj" />
+  </Folder>
   <Folder Name="/apps/server/">
     <Project Path="apps/server/ClankYankers.Server/ClankYankers.Server.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="shared/ClankYankers.Remote.Contracts/ClankYankers.Remote.Contracts.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ClankYankers.Server.IntegrationTests/ClankYankers.Server.IntegrationTests.csproj" />

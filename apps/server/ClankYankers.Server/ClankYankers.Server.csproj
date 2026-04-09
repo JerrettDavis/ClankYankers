@@ -14,6 +14,17 @@
     <PackageReference Include="Docker.DotNet" Version="3.125.15" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.4" />
     <PackageReference Include="PTY" Version="1.0.3" />
+    <PackageReference Include="SSH.NET" Version="2025.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\ClankYankers.Remote.Contracts\ClankYankers.Remote.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>ClankYankers.Server.UnitTests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <Target Name="EnsureNodeDependencies" BeforeTargets="Build" Condition="'$(Configuration)' == 'Debug' and Exists('$(SpaRoot)package.json') and !Exists('$(SpaRoot)node_modules')">

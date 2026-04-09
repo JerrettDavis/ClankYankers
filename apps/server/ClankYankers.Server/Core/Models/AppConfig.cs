@@ -29,6 +29,20 @@ public sealed record AppConfig
                     Id = "docker",
                     DisplayName = "Docker",
                     Kind = "docker"
+                },
+                new BackplaneDefinition
+                {
+                    Id = "ssh",
+                    DisplayName = "SSH",
+                    Kind = "ssh",
+                    Enabled = false
+                },
+                new BackplaneDefinition
+                {
+                    Id = "remote",
+                    DisplayName = "Remote daemon",
+                    Kind = "remote",
+                    Enabled = false
                 }
             ],
             Hosts =
@@ -52,6 +66,33 @@ public sealed record AppConfig
                     DockerEndpoint = "npipe://./pipe/docker_engine",
                     DockerImage = "alpine:3.20",
                     WorkingDirectory = "/workspace"
+                },
+                new HostConfig
+                {
+                    Id = "ssh-example",
+                    BackplaneId = "ssh",
+                    DisplayName = "Example SSH host",
+                    ShellExecutable = "/bin/bash",
+                    ShellArguments = [],
+                    WorkingDirectory = "/workspace",
+                    SshAddress = "ssh.example.internal",
+                    SshPort = 22,
+                    SshUsername = "operator",
+                    SshPrivateKeyPath = "~/.ssh/id_ed25519",
+                    SshHostKeyFingerprint = "SHA256:replace-me",
+                    Enabled = false
+                },
+                new HostConfig
+                {
+                    Id = "remote-example",
+                    BackplaneId = "remote",
+                    DisplayName = "Example remote daemon",
+                    ShellExecutable = "/bin/bash",
+                    ShellArguments = [],
+                    WorkingDirectory = "/workspace",
+                    RemoteDaemonUrl = "https://remote-node.example.internal:7331",
+                    RemoteExecutorKind = "process",
+                    Enabled = false
                 }
             ],
             Connectors =
@@ -131,6 +172,40 @@ public sealed record HostConfig
     public string? DockerEndpoint { get; init; }
 
     public string? DockerImage { get; init; }
+
+    public string? SshAddress { get; init; }
+
+    public int? SshPort { get; init; }
+
+    public string? SshUsername { get; init; }
+
+    public string? SshPassword { get; init; }
+
+    public string? SshPrivateKeyPath { get; init; }
+
+    public string? SshPrivateKeyPassphrase { get; init; }
+
+    public string? SshCertificatePath { get; init; }
+
+    public string? SshHostKeyFingerprint { get; init; }
+
+    public string? SshTrustedCaFingerprint { get; init; }
+
+    public bool SshAllowAnyHostKey { get; init; }
+
+    public bool SshUseKeyboardInteractive { get; init; }
+
+    public string? RemoteDaemonUrl { get; init; }
+
+    public string? RemoteAccessToken { get; init; }
+
+    public string? RemoteExecutorKind { get; init; }
+
+    public bool RemoteAllowInsecureTls { get; init; }
+
+    public string? RemoteDockerEndpoint { get; init; }
+
+    public string? RemoteDockerImage { get; init; }
 
     public bool Enabled { get; init; } = true;
 }

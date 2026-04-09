@@ -14,6 +14,23 @@ export interface HostConfig {
   workingDirectory: string | null
   dockerEndpoint: string | null
   dockerImage: string | null
+  sshAddress?: string | null
+  sshPort?: number | null
+  sshUsername?: string | null
+  sshPassword?: string | null
+  sshPrivateKeyPath?: string | null
+  sshPrivateKeyPassphrase?: string | null
+  sshCertificatePath?: string | null
+  sshHostKeyFingerprint?: string | null
+  sshTrustedCaFingerprint?: string | null
+  sshAllowAnyHostKey?: boolean
+  sshUseKeyboardInteractive?: boolean
+  remoteDaemonUrl?: string | null
+  remoteAccessToken?: string | null
+  remoteExecutorKind?: string | null
+  remoteAllowInsecureTls?: boolean
+  remoteDockerEndpoint?: string | null
+  remoteDockerImage?: string | null
   enabled: boolean
 }
 

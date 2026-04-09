@@ -16,7 +16,7 @@ ClankYankers is a browser-based orchestration platform that provides a unified t
 ### Key Features
 
 - **Browser-native terminal** — Full interactive terminal powered by xterm.js; ANSI rendering, keyboard passthrough, and resize support
-- **Multiple execution backplanes** — Run sessions on your local machine or inside Docker containers
+- **Multiple execution backplanes** — Run sessions on your local machine, inside Docker, over SSH, or through a remote daemon node
 - **Agent connectors** — Built-in support for Claude Code, Ollama, OpenClaw, Codex, and Gemini CLI
 - **Session management** — Start, stop, reconnect to, and run multiple sessions concurrently
 - **Plugin-driven extensibility** — Add new backplanes, connectors, and lifecycle hooks without modifying the core
@@ -52,7 +52,8 @@ ClankYankers is a browser-based orchestration platform that provides a unified t
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Node.js 20+](https://nodejs.org/) (for the web frontend)
-- Docker (optional, for Docker backplane support)
+- Docker (optional, for Docker and docker-backed remote executor support)
+- OpenSSH-compatible target (optional, for SSH backplane support)
 
 ### Run the app
 
@@ -89,6 +90,27 @@ cd apps/web
 npm run test:e2e
 ```
 
+### Remote daemon tool
+
+The remote backplane is powered by a dedicated cross-platform .NET tool in `apps/daemon/ClankYankers.Daemon`.
+
+```bash
+dotnet pack apps/daemon/ClankYankers.Daemon -c Release
+dotnet tool install --global --add-source apps/daemon/ClankYankers.Daemon/bin/Release ClankYankers.Daemon
+clank-daemon
+```
+
+The daemon exposes HTTP and WebSocket endpoints for session lifecycle, streaming terminal IO, node metadata, and self-update orchestration. Hosts configured against the `remote` backplane point the server at that daemon URL.
+
+### Backplane matrix
+
+| Backplane | Transport | Typical target | Notes |
+|------|---------|---------|-------|
+| `local` | In-process PTY | Current machine | Lowest-latency terminal path |
+| `docker` | Local Docker API | Container on current machine | Uses the configured host image and working directory |
+| `ssh` | SSH shell stream | Remote machine over SSH | Supports password, private key, certificate, and keyboard-interactive auth |
+| `remote` | HTTP + WebSocket via `clank-daemon` | Remote node process or remote Docker | Supports bearer auth, optional insecure TLS, and daemon self-update |
+
 ---
 
 ## Architecture
@@ -100,10 +122,10 @@ Browser (React + xterm.js)
     ↕ WebSocket (bi-directional)
 Application Server (.NET 10 / ASP.NET Core)
     ├── Session Orchestrator
-    ├── Backplane Layer (Local / Docker)
+    ├── Backplane Layer (Local / Docker / SSH / Remote)
     └── Connector Layer (Claude / Ollama / ...)
          ↓
-Execution Targets (Local machine / Docker containers)
+Execution Targets (Local machine / Docker containers / SSH hosts / Remote daemon nodes)
 ```
 
 ### Solution Structure
@@ -111,9 +133,11 @@ Execution Targets (Local machine / Docker containers)
 | Path | Purpose |
 |------|---------|
 | `apps/server/ClankYankers.Server` | ASP.NET Core backend — session orchestration, PTY management, WebSocket API |
+| `apps/daemon/ClankYankers.Daemon` | Packable `clank-daemon` tool — remote node daemon for process/docker execution |
 | `apps/web` | React + TypeScript frontend — terminal UI, session management |
+| `shared/ClankYankers.Remote.Contracts` | Shared DTO contracts between the server and remote daemon |
 | `tests/ClankYankers.Server.UnitTests` | Unit tests for the server |
-| `tests/ClankYankers.Server.IntegrationTests` | Integration tests (local & Docker backplanes) |
+| `tests/ClankYankers.Server.IntegrationTests` | Integration tests for local, Docker, SSH, and remote backplanes |
 
 ### WebSocket API
 
@@ -141,7 +165,7 @@ Sessions communicate over WebSocket at `/ws/session/{sessionId}`.
 - [x] **M3** — Connector abstraction (Claude Code)
 - [x] **M4** — Docker backplane
 - [ ] **M5** — Multi-connector support (OpenClaw, Ollama, Codex, Gemini)
-- [ ] **M6** — Configuration system + UI
+- [x] **M6** — Configuration system + UI
 - [ ] **M7** — Plugin system extraction
 - [ ] **M8** — Hardening + packaging (Docker image, release artifacts)
 

@@ -45,7 +45,7 @@ public sealed class SessionOrchestrator(
 
         var sessionId = Guid.NewGuid().ToString("n");
         var launchSpec = connector.BuildLaunchSpec(sessionId, request, host, connectorDefinition);
-        var launchErrors = SessionRequestValidator.ValidateResolved(backplaneDefinition, launchSpec);
+        var launchErrors = SessionRequestValidator.ValidateResolved(backplaneDefinition, host, launchSpec);
         if (launchErrors.Count > 0)
         {
             throw new SessionLaunchValidationException(launchErrors);

@@ -179,6 +179,80 @@ test('persists config changes and discards unsaved edits', async ({ page }) => {
   await expect(reloadedClaudeConnectorCard.getByLabel('Allowed tools')).toHaveValue('Read, Edit')
 })
 
+test('persists SSH and remote host settings through the config editor', async ({ page, request }) => {
+  await openDeck(page)
+  await openWorkspace(page)
+  await openConfigPanel(page)
+
+  const sshHostCard = page.getByTestId('host-card-ssh-example')
+  await expect(sshHostCard.getByTestId('host-ssh-address')).toBeVisible()
+  await expect(sshHostCard.getByTestId('host-ssh-username')).toBeVisible()
+
+  await sshHostCard.getByTestId('host-ssh-address').fill('ssh.example.test')
+  await sshHostCard.getByTestId('host-ssh-port').fill('2222')
+  await sshHostCard.getByTestId('host-ssh-username').fill('clanky')
+  await sshHostCard.getByTestId('host-ssh-private-key-path').fill('/home/clanky/.ssh/id_ed25519')
+  await sshHostCard.getByTestId('host-ssh-certificate-path').fill('/home/clanky/.ssh/id_ed25519-cert.pub')
+  await sshHostCard.getByTestId('host-ssh-allow-any-host-key').check()
+  await sshHostCard.getByTestId('host-ssh-use-keyboard-interactive').check()
+
+  const remoteHostCard = page.getByTestId('host-card-remote-example')
+  await expect(remoteHostCard.getByTestId('host-remote-daemon-url')).toBeVisible()
+  await expect(remoteHostCard.getByTestId('host-remote-executor-kind')).toBeVisible()
+
+  await remoteHostCard.getByTestId('host-remote-daemon-url').fill('https://remote.example.test')
+  await remoteHostCard.getByTestId('host-remote-access-token').fill('top-secret-token')
+  await remoteHostCard.getByTestId('host-remote-allow-insecure-tls').check()
+  await remoteHostCard.getByTestId('host-remote-executor-kind').selectOption('docker')
+  await expect(remoteHostCard.getByTestId('host-remote-docker-endpoint')).toBeVisible()
+  await expect(remoteHostCard.getByTestId('host-remote-docker-image')).toBeVisible()
+  await remoteHostCard.getByTestId('host-remote-docker-endpoint').fill('unix:///var/run/docker.sock')
+  await remoteHostCard.getByTestId('host-remote-docker-image').fill('ghcr.io/clanky/remote-agent:latest')
+
+  await page.getByTestId('save-config').click()
+  await expect(page.getByText(/config saved/i)).toBeVisible()
+
+  const response = await request.get('http://127.0.0.1:5023/api/config')
+  expect(response.ok()).toBeTruthy()
+  const savedConfig = (await response.json()) as {
+    hosts: Array<{
+      id: string
+      sshAddress?: string | null
+      sshPort?: number | null
+      sshUsername?: string | null
+      sshPrivateKeyPath?: string | null
+      sshCertificatePath?: string | null
+      sshAllowAnyHostKey?: boolean
+      sshUseKeyboardInteractive?: boolean
+      remoteDaemonUrl?: string | null
+      remoteAccessToken?: string | null
+      remoteAllowInsecureTls?: boolean
+      remoteExecutorKind?: string | null
+      remoteDockerEndpoint?: string | null
+      remoteDockerImage?: string | null
+    }>
+  }
+
+  const savedSshHost = savedConfig.hosts.find((host) => host.id === 'ssh-example')
+  expect(savedSshHost).toBeTruthy()
+  expect(savedSshHost?.sshAddress).toBe('ssh.example.test')
+  expect(savedSshHost?.sshPort).toBe(2222)
+  expect(savedSshHost?.sshUsername).toBe('clanky')
+  expect(savedSshHost?.sshPrivateKeyPath).toBe('/home/clanky/.ssh/id_ed25519')
+  expect(savedSshHost?.sshCertificatePath).toBe('/home/clanky/.ssh/id_ed25519-cert.pub')
+  expect(savedSshHost?.sshAllowAnyHostKey).toBe(true)
+  expect(savedSshHost?.sshUseKeyboardInteractive).toBe(true)
+
+  const savedRemoteHost = savedConfig.hosts.find((host) => host.id === 'remote-example')
+  expect(savedRemoteHost).toBeTruthy()
+  expect(savedRemoteHost?.remoteDaemonUrl).toBe('https://remote.example.test')
+  expect(savedRemoteHost?.remoteAccessToken).toBe('top-secret-token')
+  expect(savedRemoteHost?.remoteAllowInsecureTls).toBe(true)
+  expect(savedRemoteHost?.remoteExecutorKind).toBe('docker')
+  expect(savedRemoteHost?.remoteDockerEndpoint).toBe('unix:///var/run/docker.sock')
+  expect(savedRemoteHost?.remoteDockerImage).toBe('ghcr.io/clanky/remote-agent:latest')
+})
+
 test('shows connector-specific launch overrides for client CLIs', async ({ page }) => {
   await openDeck(page)
   await openWorkspace(page)

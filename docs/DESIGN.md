@@ -48,6 +48,8 @@ The architecture prioritizes:
 |  Backplane Layer                               |
 |   - Local Backplane                            |
 |   - Docker Backplane                           |
+|   - SSH Backplane                              |
+|   - Remote Backplane                           |
 |                                                |
 |  Connector Layer                               |
 |   - Claude Connector                           |
@@ -62,7 +64,7 @@ The architecture prioritizes:
                +---------v---------+
                | Execution Targets |
                | Local / Docker    |
-               | VM / SSH (future) |
+               | SSH / Remote node |
                +-------------------+
 ```
 
@@ -159,6 +161,17 @@ IBackplane
 
 * LocalBackplane
 * DockerBackplane
+* SshBackplane
+* RemoteBackplane
+
+#### Remote daemon model
+
+The remote backplane uses a dedicated `clank-daemon` .NET tool as a node-local execution service.
+
+* The application server calls the daemon over HTTP for session control and node metadata.
+* The browser terminal still speaks to the main server; the server bridges terminal traffic to the daemon over WebSocket.
+* The daemon can execute sessions either as local PTY-backed processes or through a node-local Docker runtime.
+* Self-update is modeled as an out-of-process daemon RPC so the node can replace itself without corrupting a live process image.
 
 ---
 
@@ -177,7 +190,8 @@ Examples:
 
 * Local machine
 * Docker daemon
-* Remote Docker host
+* SSH host
+* Remote daemon node
 
 ---
 

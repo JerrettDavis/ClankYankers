@@ -15,7 +15,7 @@ public static class ConfigValidator
         IEnumerable<string>? supportedConnectorKinds = null)
     {
         var errors = new Dictionary<string, string[]>();
-        var supportedBackplanes = (supportedBackplaneKinds ?? ["local", "docker"])
+        var supportedBackplanes = (supportedBackplaneKinds ?? ["local", "docker", "ssh", "remote"])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var supportedConnectors = (supportedConnectorKinds ?? ["shell", "ollama", "claude"])
@@ -125,12 +125,9 @@ public static class ConfigValidator
                 [$"Enabled hosts require a shell executable: {string.Join(", ", hostsMissingShellExecutable)}."];
         }
 
-        var dockerHostsMissingEndpoint = config.Hosts
-            .Where(host => host.Enabled
-                && backplaneKindsById.TryGetValue(host.BackplaneId, out var kind)
-                && kind.Equals("docker", StringComparison.OrdinalIgnoreCase)
-                && string.IsNullOrWhiteSpace(host.DockerEndpoint))
-            .Select(host => string.IsNullOrWhiteSpace(host.Id) ? "<blank-id>" : host.Id)
+        var dockerHostsMissingEndpoint = GetEnabledHostsForKind(config, backplaneKindsById, "docker")
+            .Where(host => string.IsNullOrWhiteSpace(host.DockerEndpoint))
+            .Select(GetDisplayableHostId)
             .ToArray();
 
         if (dockerHostsMissingEndpoint.Length > 0)
@@ -139,18 +136,134 @@ public static class ConfigValidator
                 [$"Enabled Docker hosts require a Docker endpoint: {string.Join(", ", dockerHostsMissingEndpoint)}."];
         }
 
-        var dockerHostsMissingImage = config.Hosts
-            .Where(host => host.Enabled
-                && backplaneKindsById.TryGetValue(host.BackplaneId, out var kind)
-                && kind.Equals("docker", StringComparison.OrdinalIgnoreCase)
-                && string.IsNullOrWhiteSpace(host.DockerImage))
-            .Select(host => string.IsNullOrWhiteSpace(host.Id) ? "<blank-id>" : host.Id)
+        var dockerHostsMissingImage = GetEnabledHostsForKind(config, backplaneKindsById, "docker")
+            .Where(host => string.IsNullOrWhiteSpace(host.DockerImage))
+            .Select(GetDisplayableHostId)
             .ToArray();
 
         if (dockerHostsMissingImage.Length > 0)
         {
             errors["hosts.dockerImage"] =
                 [$"Enabled Docker hosts require a Docker image: {string.Join(", ", dockerHostsMissingImage)}."];
+        }
+
+        var sshHostsMissingAddress = GetEnabledHostsForKind(config, backplaneKindsById, "ssh")
+            .Where(host => string.IsNullOrWhiteSpace(host.SshAddress))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (sshHostsMissingAddress.Length > 0)
+        {
+            errors["hosts.sshAddress"] =
+                [$"Enabled SSH hosts require an address: {string.Join(", ", sshHostsMissingAddress)}."];
+        }
+
+        var sshHostsMissingUsername = GetEnabledHostsForKind(config, backplaneKindsById, "ssh")
+            .Where(host => string.IsNullOrWhiteSpace(host.SshUsername))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (sshHostsMissingUsername.Length > 0)
+        {
+            errors["hosts.sshUsername"] =
+                [$"Enabled SSH hosts require a username: {string.Join(", ", sshHostsMissingUsername)}."];
+        }
+
+        var sshHostsWithInvalidPort = GetEnabledHostsForKind(config, backplaneKindsById, "ssh")
+            .Where(host => host.SshPort is <= 0 or > 65535)
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (sshHostsWithInvalidPort.Length > 0)
+        {
+            errors["hosts.sshPort"] =
+                [$"Enabled SSH hosts must use a port between 1 and 65535: {string.Join(", ", sshHostsWithInvalidPort)}."];
+        }
+
+        var sshHostsMissingAuth = GetEnabledHostsForKind(config, backplaneKindsById, "ssh")
+            .Where(host =>
+                string.IsNullOrWhiteSpace(host.SshPassword)
+                && string.IsNullOrWhiteSpace(host.SshPrivateKeyPath)
+                && !host.SshUseKeyboardInteractive)
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (sshHostsMissingAuth.Length > 0)
+        {
+            errors["hosts.sshAuthentication"] =
+                [$"Enabled SSH hosts require a password, private key, or keyboard-interactive auth: {string.Join(", ", sshHostsMissingAuth)}."];
+        }
+
+        var sshHostsWithCertificateButNoKey = GetEnabledHostsForKind(config, backplaneKindsById, "ssh")
+            .Where(host => !string.IsNullOrWhiteSpace(host.SshCertificatePath) && string.IsNullOrWhiteSpace(host.SshPrivateKeyPath))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (sshHostsWithCertificateButNoKey.Length > 0)
+        {
+            errors["hosts.sshCertificatePath"] =
+                [$"Enabled SSH hosts require a private key path when a certificate path is configured: {string.Join(", ", sshHostsWithCertificateButNoKey)}."];
+        }
+
+        var sshHostsMissingTrustPolicy = GetEnabledHostsForKind(config, backplaneKindsById, "ssh")
+            .Where(host =>
+                !host.SshAllowAnyHostKey
+                && string.IsNullOrWhiteSpace(host.SshHostKeyFingerprint)
+                && string.IsNullOrWhiteSpace(host.SshTrustedCaFingerprint))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (sshHostsMissingTrustPolicy.Length > 0)
+        {
+            errors["hosts.sshTrust"] =
+                [$"Enabled SSH hosts must pin a host key, trust a CA fingerprint, or explicitly allow any host key: {string.Join(", ", sshHostsMissingTrustPolicy)}."];
+        }
+
+        var remoteHostsMissingUrl = GetEnabledHostsForKind(config, backplaneKindsById, "remote")
+            .Where(host => string.IsNullOrWhiteSpace(host.RemoteDaemonUrl))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (remoteHostsMissingUrl.Length > 0)
+        {
+            errors["hosts.remoteDaemonUrl"] =
+                [$"Enabled remote hosts require a daemon URL: {string.Join(", ", remoteHostsMissingUrl)}."];
+        }
+
+        var remoteHostsWithInvalidUrl = GetEnabledHostsForKind(config, backplaneKindsById, "remote")
+            .Where(host => !string.IsNullOrWhiteSpace(host.RemoteDaemonUrl) && !Uri.TryCreate(host.RemoteDaemonUrl, UriKind.Absolute, out _))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (remoteHostsWithInvalidUrl.Length > 0)
+        {
+            errors["hosts.remoteDaemonUrl.invalid"] =
+                [$"Enabled remote hosts must use an absolute daemon URL: {string.Join(", ", remoteHostsWithInvalidUrl)}."];
+        }
+
+        var remoteHostsWithInvalidExecutor = GetEnabledHostsForKind(config, backplaneKindsById, "remote")
+            .Where(host => !string.IsNullOrWhiteSpace(host.RemoteExecutorKind)
+                && !host.RemoteExecutorKind.Equals("process", StringComparison.OrdinalIgnoreCase)
+                && !host.RemoteExecutorKind.Equals("docker", StringComparison.OrdinalIgnoreCase))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (remoteHostsWithInvalidExecutor.Length > 0)
+        {
+            errors["hosts.remoteExecutorKind"] =
+                [$"Enabled remote hosts must use executor kinds of 'process' or 'docker': {string.Join(", ", remoteHostsWithInvalidExecutor)}."];
+        }
+
+        var remoteDockerHostsMissingImage = GetEnabledHostsForKind(config, backplaneKindsById, "remote")
+            .Where(host => host.RemoteExecutorKind?.Equals("docker", StringComparison.OrdinalIgnoreCase) == true
+                && string.IsNullOrWhiteSpace(host.RemoteDockerImage))
+            .Select(GetDisplayableHostId)
+            .ToArray();
+
+        if (remoteDockerHostsMissingImage.Length > 0)
+        {
+            errors["hosts.remoteDockerImage"] =
+                [$"Enabled remote Docker hosts require a Docker image: {string.Join(", ", remoteDockerHostsMissingImage)}."];
         }
 
         var duplicateBackplaneIds = config.Backplanes
@@ -165,7 +278,8 @@ public static class ConfigValidator
         }
 
         var unsupportedBackplaneKinds = config.Backplanes
-            .Where(backplane => !supportedBackplanes.Contains(backplane.Kind, StringComparer.OrdinalIgnoreCase))
+            .Where(backplane => backplane.Enabled
+                && !supportedBackplanes.Contains(backplane.Kind, StringComparer.OrdinalIgnoreCase))
             .Select(backplane => $"{backplane.Id} ({backplane.Kind})")
             .ToArray();
 
@@ -207,7 +321,8 @@ public static class ConfigValidator
         }
 
         var unknownConnectorKinds = config.Connectors
-            .Where(connector => !supportedConnectors.Contains(connector.Kind, StringComparer.OrdinalIgnoreCase))
+            .Where(connector => connector.Enabled
+                && !supportedConnectors.Contains(connector.Kind, StringComparer.OrdinalIgnoreCase))
             .Select(connector => $"{connector.Id} ({connector.Kind})")
             .ToArray();
 
@@ -383,6 +498,18 @@ public static class ConfigValidator
             trimmed.Equals(reserved, StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith($"{reserved}=", StringComparison.OrdinalIgnoreCase));
     }
+
+    private static IEnumerable<HostConfig> GetEnabledHostsForKind(
+        AppConfig config,
+        IReadOnlyDictionary<string, string> backplaneKindsById,
+        string expectedKind) =>
+        config.Hosts.Where(host =>
+            host.Enabled
+            && backplaneKindsById.TryGetValue(host.BackplaneId, out var kind)
+            && kind.Equals(expectedKind, StringComparison.OrdinalIgnoreCase));
+
+    private static string GetDisplayableHostId(HostConfig host) =>
+        string.IsNullOrWhiteSpace(host.Id) ? "<blank-id>" : host.Id;
 
     public static void ThrowIfInvalid(
         AppConfig config,

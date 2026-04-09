@@ -40,6 +40,8 @@ builder.Services.AddSingleton<ClaudeHomeCatalog>();
 builder.Services.AddSingleton<IPtyProcessFactory, WindowsConPtyProcessFactory>();
 builder.Services.AddSingleton<IBackplane, LocalBackplane>();
 builder.Services.AddSingleton<IBackplane, DockerBackplane>();
+builder.Services.AddSingleton<IBackplane, SshBackplane>();
+builder.Services.AddSingleton<IBackplane, RemoteBackplane>();
 builder.Services.AddSingleton<IAgentConnector, ShellConnector>();
 builder.Services.AddSingleton<IAgentConnector, OllamaConnector>();
 builder.Services.AddSingleton<IAgentConnector, ClaudeConnector>();

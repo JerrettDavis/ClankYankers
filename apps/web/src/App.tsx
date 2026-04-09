@@ -3141,6 +3141,9 @@ interface HostEditorProps {
 }
 
 function HostEditor({ host, backplanes, onChange, onRemove }: HostEditorProps) {
+  const selectedBackplaneKind =
+    backplanes.find((backplane) => backplane.id === host.backplaneId)?.kind.toLowerCase() ?? 'local'
+
   return (
     <article className="config-card" data-testid={`host-card-${host.id}`}>
       <header className="config-card__header">
@@ -3197,24 +3200,222 @@ function HostEditor({ host, backplanes, onChange, onRemove }: HostEditorProps) {
             }
           />
         </label>
-        <label className="field">
-          <span>Docker endpoint</span>
-          <input
-            value={host.dockerEndpoint ?? ''}
-            onChange={(event) =>
-              onChange({ ...host, dockerEndpoint: event.target.value.trim() || null })
-            }
-          />
-        </label>
-        <label className="field">
-          <span>Docker image</span>
-          <input
-            value={host.dockerImage ?? ''}
-            onChange={(event) =>
-              onChange({ ...host, dockerImage: event.target.value.trim() || null })
-            }
-          />
-        </label>
+        {selectedBackplaneKind === 'docker' ? (
+          <>
+            <label className="field">
+              <span>Docker endpoint</span>
+              <input
+                value={host.dockerEndpoint ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, dockerEndpoint: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Docker image</span>
+              <input
+                value={host.dockerImage ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, dockerImage: event.target.value.trim() || null })
+                }
+              />
+            </label>
+          </>
+        ) : null}
+        {selectedBackplaneKind === 'ssh' ? (
+          <>
+            <label className="field">
+              <span>SSH address</span>
+              <input
+                data-testid="host-ssh-address"
+                value={host.sshAddress ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshAddress: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>SSH port</span>
+              <input
+                data-testid="host-ssh-port"
+                type="number"
+                min={1}
+                max={65535}
+                value={host.sshPort ?? 22}
+                onChange={(event) =>
+                  onChange({ ...host, sshPort: Number.parseInt(event.target.value, 10) || 22 })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>SSH username</span>
+              <input
+                data-testid="host-ssh-username"
+                value={host.sshUsername ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshUsername: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>SSH password</span>
+              <input
+                data-testid="host-ssh-password"
+                type="password"
+                value={host.sshPassword ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshPassword: event.target.value || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>SSH private key path</span>
+              <input
+                data-testid="host-ssh-private-key-path"
+                value={host.sshPrivateKeyPath ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshPrivateKeyPath: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>SSH private key passphrase</span>
+              <input
+                data-testid="host-ssh-private-key-passphrase"
+                type="password"
+                value={host.sshPrivateKeyPassphrase ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshPrivateKeyPassphrase: event.target.value || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>SSH certificate path</span>
+              <input
+                data-testid="host-ssh-certificate-path"
+                value={host.sshCertificatePath ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshCertificatePath: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Host key fingerprint</span>
+              <input
+                data-testid="host-ssh-host-key-fingerprint"
+                value={host.sshHostKeyFingerprint ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshHostKeyFingerprint: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Trusted CA fingerprint</span>
+              <input
+                data-testid="host-ssh-trusted-ca-fingerprint"
+                value={host.sshTrustedCaFingerprint ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, sshTrustedCaFingerprint: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="toggle">
+              <input
+                data-testid="host-ssh-allow-any-host-key"
+                type="checkbox"
+                checked={Boolean(host.sshAllowAnyHostKey)}
+                onChange={(event) =>
+                  onChange({ ...host, sshAllowAnyHostKey: event.target.checked })
+                }
+              />
+              <span>Allow any host key</span>
+            </label>
+            <label className="toggle">
+              <input
+                data-testid="host-ssh-use-keyboard-interactive"
+                type="checkbox"
+                checked={Boolean(host.sshUseKeyboardInteractive)}
+                onChange={(event) =>
+                  onChange({ ...host, sshUseKeyboardInteractive: event.target.checked })
+                }
+              />
+              <span>Use keyboard-interactive auth</span>
+            </label>
+          </>
+        ) : null}
+        {selectedBackplaneKind === 'remote' ? (
+          <>
+            <label className="field">
+              <span>Remote daemon URL</span>
+              <input
+                data-testid="host-remote-daemon-url"
+                value={host.remoteDaemonUrl ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, remoteDaemonUrl: event.target.value.trim() || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Remote access token</span>
+              <input
+                data-testid="host-remote-access-token"
+                type="password"
+                value={host.remoteAccessToken ?? ''}
+                onChange={(event) =>
+                  onChange({ ...host, remoteAccessToken: event.target.value || null })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Remote executor</span>
+              <select
+                data-testid="host-remote-executor-kind"
+                value={host.remoteExecutorKind ?? 'process'}
+                onChange={(event) =>
+                  onChange({ ...host, remoteExecutorKind: event.target.value })
+                }
+              >
+                <option value="process">process</option>
+                <option value="docker">docker</option>
+              </select>
+            </label>
+            <label className="toggle">
+              <input
+                data-testid="host-remote-allow-insecure-tls"
+                type="checkbox"
+                checked={Boolean(host.remoteAllowInsecureTls)}
+                onChange={(event) =>
+                  onChange({ ...host, remoteAllowInsecureTls: event.target.checked })
+                }
+              />
+              <span>Allow insecure TLS</span>
+            </label>
+            {host.remoteExecutorKind === 'docker' ? (
+              <>
+                <label className="field">
+                  <span>Remote Docker endpoint</span>
+                  <input
+                    data-testid="host-remote-docker-endpoint"
+                    value={host.remoteDockerEndpoint ?? ''}
+                    onChange={(event) =>
+                      onChange({ ...host, remoteDockerEndpoint: event.target.value.trim() || null })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span>Remote Docker image</span>
+                  <input
+                    data-testid="host-remote-docker-image"
+                    value={host.remoteDockerImage ?? ''}
+                    onChange={(event) =>
+                      onChange({ ...host, remoteDockerImage: event.target.value.trim() || null })
+                    }
+                  />
+                </label>
+              </>
+            ) : null}
+          </>
+        ) : null}
         <label className="toggle">
           <input
             type="checkbox"

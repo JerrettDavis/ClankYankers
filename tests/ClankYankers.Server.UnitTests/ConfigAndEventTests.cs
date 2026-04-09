@@ -3,6 +3,7 @@ using ClankYankers.Server.Core.Models;
 using ClankYankers.Server.Features.Config;
 using ClankYankers.Server.Features.Sessions;
 using ClankYankers.Server.Infrastructure.Observability;
+using ClankYankers.Server.Infrastructure.Ssh;
 using Microsoft.Extensions.Logging;
 
 namespace ClankYankers.Server.UnitTests;
@@ -116,6 +117,71 @@ public sealed class ConfigAndEventTests
     }
 
     [Fact]
+    public void SshBootstrapCommandBuilder_includes_environment_for_posix_commands()
+    {
+        var host = new HostConfig
+        {
+            Id = "ssh-host",
+            BackplaneId = "ssh",
+            DisplayName = "SSH",
+            ShellExecutable = "/bin/bash",
+            ShellArguments = []
+        };
+        var launchSpec = new LaunchSpec
+        {
+            SessionId = "session-1",
+            DisplayCommand = "claude",
+            FileName = "claude",
+            Arguments = ["--print"],
+            WorkingDirectory = "/workspace",
+            Environment = new Dictionary<string, string?>
+            {
+                ["ANTHROPIC_API_KEY"] = "secret-value"
+            },
+            Cols = 120,
+            Rows = 34
+        };
+
+        var command = SshBootstrapCommandBuilder.Build(host, launchSpec);
+
+        Assert.NotNull(command);
+        Assert.Contains("cd '/workspace' && exec ANTHROPIC_API_KEY='secret-value' 'claude' '--print'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SshBootstrapCommandBuilder_initializes_environment_for_powershell_shell_launches()
+    {
+        var host = new HostConfig
+        {
+            Id = "ssh-host",
+            BackplaneId = "ssh",
+            DisplayName = "SSH",
+            ShellExecutable = "pwsh",
+            ShellArguments = ["-NoLogo"]
+        };
+        var launchSpec = new LaunchSpec
+        {
+            SessionId = "session-1",
+            DisplayCommand = "pwsh",
+            FileName = "pwsh",
+            Arguments = ["-NoLogo"],
+            WorkingDirectory = "C:\\workspace",
+            Environment = new Dictionary<string, string?>
+            {
+                ["CLAUDE_PERMISSION_MODE"] = "plan"
+            },
+            Cols = 120,
+            Rows = 34
+        };
+
+        var command = SshBootstrapCommandBuilder.Build(host, launchSpec);
+
+        Assert.NotNull(command);
+        Assert.Contains("$env:CLAUDE_PERMISSION_MODE = 'plan'", command, StringComparison.Ordinal);
+        Assert.Contains("Set-Location -LiteralPath 'C:\\workspace'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SessionRequestValidator_rejects_out_of_range_terminal_dimensions()
     {
         var errors = SessionRequestValidator.Validate(new CreateSessionRequest
@@ -137,6 +203,13 @@ public sealed class ConfigAndEventTests
                 Id = "local",
                 DisplayName = "Local",
                 Kind = "local"
+            },
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe"
             },
             new LaunchSpec
             {
@@ -162,6 +235,13 @@ public sealed class ConfigAndEventTests
                 DisplayName = "Local",
                 Kind = "local"
             },
+            new HostConfig
+            {
+                Id = "local-host",
+                BackplaneId = "local",
+                DisplayName = "Local",
+                ShellExecutable = "pwsh.exe"
+            },
             new LaunchSpec
             {
                 SessionId = "session-1",
@@ -185,6 +265,13 @@ public sealed class ConfigAndEventTests
                 DisplayName = "Docker",
                 Kind = "docker"
             },
+            new HostConfig
+            {
+                Id = "docker-host",
+                BackplaneId = "docker",
+                DisplayName = "Docker",
+                ShellExecutable = "/bin/sh"
+            },
             new LaunchSpec
             {
                 SessionId = "session-1",
@@ -207,6 +294,13 @@ public sealed class ConfigAndEventTests
                 Id = "docker",
                 DisplayName = "Docker",
                 Kind = "docker"
+            },
+            new HostConfig
+            {
+                Id = "docker-host",
+                BackplaneId = "docker",
+                DisplayName = "Docker",
+                ShellExecutable = "/bin/sh"
             },
             new LaunchSpec
             {
@@ -306,6 +400,107 @@ public sealed class ConfigAndEventTests
         Assert.Contains("connectors.id.required", errors.Keys);
         Assert.Contains("connectors.displayName", errors.Keys);
         Assert.Contains("connectors.launchArguments", errors.Keys);
+    }
+
+    [Fact]
+    public void ConfigValidator_rejects_invalid_enabled_ssh_hosts()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "ssh",
+                    DisplayName = "SSH",
+                    Kind = "ssh"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "ssh-host",
+                    BackplaneId = "ssh",
+                    DisplayName = "SSH host",
+                    ShellExecutable = "/bin/bash",
+                    SshPort = 70000
+                }
+            ]
+        };
+
+        var errors = ConfigValidator.Validate(config, ["ssh"], ["shell", "claude", "ollama"]);
+
+        Assert.Contains("hosts.sshAddress", errors.Keys);
+        Assert.Contains("hosts.sshUsername", errors.Keys);
+        Assert.Contains("hosts.sshPort", errors.Keys);
+        Assert.Contains("hosts.sshAuthentication", errors.Keys);
+        Assert.Contains("hosts.sshTrust", errors.Keys);
+    }
+
+    [Fact]
+    public void ConfigValidator_rejects_invalid_enabled_remote_hosts()
+    {
+        var config = AppConfig.CreateDefault() with
+        {
+            Backplanes =
+            [
+                new BackplaneDefinition
+                {
+                    Id = "remote",
+                    DisplayName = "Remote",
+                    Kind = "remote"
+                }
+            ],
+            Hosts =
+            [
+                new HostConfig
+                {
+                    Id = "remote-host",
+                    BackplaneId = "remote",
+                    DisplayName = "Remote host",
+                    ShellExecutable = "/bin/bash",
+                    RemoteDaemonUrl = "not-a-url",
+                    RemoteExecutorKind = "docker"
+                }
+            ]
+        };
+
+        var errors = ConfigValidator.Validate(config, ["remote"], ["shell", "claude", "ollama"]);
+
+        Assert.Contains("hosts.remoteDaemonUrl.invalid", errors.Keys);
+        Assert.Contains("hosts.remoteDockerImage", errors.Keys);
+    }
+
+    [Fact]
+    public void SessionRequestValidator_rejects_relative_remote_docker_working_directories_after_resolution()
+    {
+        var errors = SessionRequestValidator.ValidateResolved(
+            new BackplaneDefinition
+            {
+                Id = "remote",
+                DisplayName = "Remote",
+                Kind = "remote"
+            },
+            new HostConfig
+            {
+                Id = "remote-docker",
+                BackplaneId = "remote",
+                DisplayName = "Remote Docker",
+                ShellExecutable = "/bin/sh",
+                RemoteExecutorKind = "docker"
+            },
+            new LaunchSpec
+            {
+                SessionId = "session-1",
+                DisplayCommand = "/bin/sh",
+                FileName = "/bin/sh",
+                WorkingDirectory = "workspace",
+                Cols = 120,
+                Rows = 34
+            });
+
+        Assert.Equal(["Docker workspace folder must be an absolute path such as /workspace."], errors["workingDirectory"]);
     }
 
     [Fact]

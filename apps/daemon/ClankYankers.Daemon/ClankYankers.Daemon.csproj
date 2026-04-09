@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>ClankYankers.Daemon</AssemblyName>
+    <PackageId>ClankYankers.Daemon</PackageId>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>clank-daemon</ToolCommandName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+    <PackageReference Include="PTY" Version="1.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\ClankYankers.Remote.Contracts\ClankYankers.Remote.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
