@@ -1,0 +1,68 @@
+name: Screenshots
+
+on:
+  schedule:
+    # Refresh docs screenshots every Monday at 03:00 UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: apps/web
+
+      - name: Build solution
+        run: dotnet build ClankYankers.slnx --configuration Release --no-restore /p:ContinuousIntegrationBuild=true
+
+      - name: Install Playwright browsers
+        run: |
+          PLAYWRIGHT_SCRIPT="$(find tests/ClankYankers.Studio.AcceptanceTests/bin/Release -name playwright.ps1 -print -quit)"
+          pwsh "$PLAYWRIGHT_SCRIPT" install --with-deps chromium
+
+      - name: Run screenshot scenarios
+        env:
+          SCREENSHOT_OUTPUT_DIR: ${{ github.workspace }}/docs/assets/bdd
+        run: |
+          dotnet test ClankYankers.slnx \
+            --configuration Release \
+            --no-build \
+            --filter "FullyQualifiedName~StudioScreenshots"
+
+      - name: Commit updated screenshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/bdd/ui-*.png
+          if git diff --cached --quiet; then
+            echo "No screenshot changes to commit."
+          else
+            git commit -m "docs: refresh UI screenshots [skip ci]"
+            git push
+          fi
