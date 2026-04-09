@@ -140,7 +140,7 @@ describe('App', () => {
     expect(screen.getByTestId('studio-sidebar')).toHaveAttribute('aria-hidden', 'true')
     expect(await screen.findByRole('heading', { name: /new session/i })).toBeInTheDocument()
     expect(screen.getByTestId('launch-working-directory')).toHaveValue('C:\\git\\ClankYankers')
-    expect(screen.getByRole('button', { name: /launch session/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /start session/i })).toBeInTheDocument()
     expect(screen.getAllByText(/no live sessions yet/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /save config/i })).toBeInTheDocument()
     expect(screen.getByTestId('nav-section-overview')).toBeInTheDocument()
@@ -201,7 +201,7 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /new session/i }))
     expect(await screen.findByTestId('launch-working-directory')).toHaveValue('C:\\git\\ClankYankers')
-    fireEvent.click(screen.getByRole('button', { name: /launch session/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start session/i }))
 
     await waitFor(() => {
       expect(createPayload).toMatchObject({
@@ -263,7 +263,7 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('button', { name: /new session/i }))
     const workspaceFolder = await screen.findByTestId('launch-working-directory')
     fireEvent.change(workspaceFolder, { target: { value: 'C:\\Users\\jd\\source' } })
-    fireEvent.click(screen.getByRole('button', { name: /launch session/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start session/i }))
 
     await waitFor(() => {
       expect(createPayload).toMatchObject({
@@ -340,15 +340,18 @@ describe('App', () => {
 
     expect(await screen.findByTestId('launch-permission-mode')).toBeInTheDocument()
     expect(screen.getByTestId('launch-agent')).toBeInTheDocument()
-    expect(screen.getByTestId('launch-allowed-tools')).toBeInTheDocument()
+    expect(screen.getByTestId('launch-allowed-tools-toggle')).toBeInTheDocument()
 
     fireEvent.change(screen.getByTestId('launch-model'), { target: { value: 'opus-4.6' } })
     fireEvent.change(screen.getByTestId('launch-permission-mode'), { target: { value: 'acceptEdits' } })
     fireEvent.click(screen.getByTestId('launch-skip-permissions'))
     fireEvent.change(screen.getByTestId('launch-agent'), { target: { value: 'frontend-developer' } })
+    fireEvent.click(screen.getByTestId('launch-allowed-tools-toggle'))
+    expect(screen.getByTestId('launch-allowed-tools')).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('Task'))
     fireEvent.change(screen.getByTestId('launch-custom-tools'), { target: { value: 'Bash(git diff *)' } })
-    fireEvent.click(screen.getByRole('button', { name: /launch session/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /start session/i }))
 
     await waitFor(() => {
       expect(createPayload).toMatchObject({

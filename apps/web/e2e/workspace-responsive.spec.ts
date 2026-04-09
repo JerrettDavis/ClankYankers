@@ -11,7 +11,13 @@ const coreViewports = [
 
 const stageControlIds = ['workspace-studio-nav-toggle', 'refresh-sessions', 'workspace-launch-blade-toggle', 'single-pane'] as const
 const bladeControlIds = ['launch-backplane', 'launch-host', 'launch-connector', 'launch-working-directory', 'launch-cols', 'launch-rows', 'launch-session'] as const
-const claudeBladeControlIds = ['launch-model', 'launch-permission-mode', 'launch-agent', 'launch-skip-permissions', 'launch-allowed-tools'] as const
+const claudeBladeControlIds = [
+  'launch-model',
+  'launch-permission-mode',
+  'launch-agent',
+  'launch-skip-permissions',
+  'launch-allowed-tools-toggle',
+] as const
 
 test.describe('workspace responsiveness and accessibility', () => {
   test('keeps the focused workspace fully visible across the core viewport matrix', async ({ page }) => {
@@ -52,6 +58,9 @@ test.describe('workspace responsiveness and accessibility', () => {
         for (const testId of claudeBladeControlIds) {
           await assertVisibleAndInteractable(page.getByTestId(testId))
         }
+
+        await page.getByTestId('launch-allowed-tools-toggle').click()
+        await assertVisibleAndInteractable(page.getByTestId('launch-allowed-tools'))
       })
     }
   })

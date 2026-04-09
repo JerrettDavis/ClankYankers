@@ -423,6 +423,13 @@ code {
   padding: var(--space-xl) var(--space-xl) 0;
 }
 
+.panel__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .panel__header h2,
 .config-block__header h3,
 .stage__header h2,
@@ -447,6 +454,16 @@ code {
 
 .launch-form {
   padding: var(--space-xl);
+}
+
+.panel--launch {
+  display: grid;
+  grid-template-rows: auto auto;
+}
+
+.panel--launch .panel__header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--line-soft) 86%, transparent);
 }
 
 .field {
@@ -555,6 +572,138 @@ code {
   border: 1px solid color-mix(in oklab, var(--line-soft) 88%, white);
   background: color-mix(in oklab, var(--surface-soft) 80%, transparent);
   padding: 0.78rem 0.9rem;
+}
+
+.tool-picker {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.tool-picker__toggle {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.78rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in oklab, var(--line-strong) 90%, white);
+  background: var(--input-surface);
+  color: var(--ink-0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.tool-picker__toggle:hover {
+  border-color: color-mix(in oklab, var(--accent-0) 28%, var(--line-strong));
+}
+
+.tool-picker__toggle:focus-visible {
+  border-color: color-mix(in oklab, var(--accent-emphasis) 62%, var(--paper-0));
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+.tool-picker__toggle strong {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tool-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.tool-picker__empty {
+  margin: 0;
+  padding: 0.72rem 0.78rem;
+  border: 1px dashed color-mix(in oklab, var(--line-soft) 90%, transparent);
+  background: color-mix(in oklab, var(--surface-card) 82%, transparent);
+  color: var(--ink-1);
+  font-size: 0.84rem;
+}
+
+.selection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 2rem;
+  max-inline-size: 100%;
+  padding: 0.28rem 0.58rem;
+  border: 1px solid color-mix(in oklab, var(--accent-0) 24%, var(--line-soft));
+  background: color-mix(in oklab, var(--accent-ghost) 72%, var(--surface-card));
+  color: var(--accent-emphasis);
+  font-size: 0.82rem;
+}
+
+.selection-chip > span {
+  overflow-wrap: anywhere;
+}
+
+.selection-chip--readonly {
+  border-color: color-mix(in oklab, var(--line-soft) 88%, white);
+  background: color-mix(in oklab, var(--surface-card) 92%, transparent);
+  color: var(--ink-1);
+}
+
+.selection-chip__remove {
+  inline-size: 1rem;
+  block-size: 1rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: inline-grid;
+  place-items: center;
+}
+
+.tool-picker__menu {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.78rem;
+  border: 1px solid color-mix(in oklab, var(--line-soft) 88%, white);
+  background: color-mix(in oklab, var(--surface-card) 96%, transparent);
+}
+
+.tool-picker__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.45rem;
+  max-block-size: 12rem;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.tool-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.58rem;
+  border: 1px solid color-mix(in oklab, var(--line-soft) 90%, transparent);
+  background: color-mix(in oklab, var(--surface-float) 96%, transparent);
+  font-size: 0.84rem;
+}
+
+.tool-option input {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex: none;
+}
+
+.tool-option.is-selected {
+  border-color: color-mix(in oklab, var(--accent-0) 38%, var(--line-strong));
+  background: color-mix(in oklab, var(--accent-ghost) 74%, var(--surface-float));
+}
+
+.tool-picker__custom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
 }
 
 .button {
@@ -814,6 +963,9 @@ code {
 .panel--launch .launch-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
+  align-content: start;
+  padding-block-start: 0.75rem;
+  padding-block-end: calc(var(--space-xl) + env(safe-area-inset-bottom) + 0.75rem);
 }
 
 .panel--launch .launch-form > .field:nth-of-type(3),
@@ -821,7 +973,8 @@ code {
 .panel--launch .launch-form > .field-note,
 .panel--launch .launch-form > .launch-overrides,
 .panel--launch .launch-form > .dimension-grid,
-.panel--launch .launch-form > .launch-button {
+.panel--launch .launch-form > .launch-button,
+.panel--launch .launch-form > .launch-form__footnote {
   grid-column: 1 / -1;
 }
 
@@ -852,7 +1005,6 @@ code {
   border-color: color-mix(in oklab, var(--accent-0) 38%, var(--line-strong));
   background: color-mix(in oklab, var(--accent-ghost) 72%, var(--surface-float));
 }
-
 .rail .field input,
 .rail .field select {
   min-height: 2.75rem;
@@ -1435,7 +1587,8 @@ code {
   .config-card__grid,
   .launch-overrides,
   .dimension-grid,
-  .panel--launch .launch-form {
+  .panel--launch .launch-form,
+  .tool-picker__custom-row {
     grid-template-columns: 1fr;
   }
 
@@ -1526,6 +1679,15 @@ code {
   .workspace-board,
   .workspace-pane__body {
     padding-inline: 0;
+  }
+
+  .panel__header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .panel__header-actions .button {
+    flex: 1 1 0;
   }
 }
 

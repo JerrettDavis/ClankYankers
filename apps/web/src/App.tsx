@@ -1462,7 +1462,7 @@ function OverviewPage({
         <MetricStrip items={[...sessionMetrics, ...inventoryMetrics]} />
 
         <div className="overview-grid">
-          <section className="panel">
+          <section className="panel panel--overview-pulse">
             <div className="panel__header">
               <div>
                 <p className="eyebrow">Operational pulse</p>
@@ -1493,7 +1493,7 @@ function OverviewPage({
             </div>
           </section>
 
-          <section className="panel">
+          <section className="panel panel--overview-surfaces">
             <div className="panel__header">
               <div>
                 <p className="eyebrow">Product surfaces</p>
@@ -1815,6 +1815,7 @@ function WorkspacePage({
                 enabledBackplanes={enabledBackplanes}
                 enabledConnectors={enabledConnectors}
                 isCreatingSession={isCreatingSession}
+                key={selectedConnector?.id ?? 'launch-panel'}
                 launchDraft={launchDraft}
                 onClose={() => onToggleLaunchBlade(false)}
                 onLaunchSession={onLaunchSession}
@@ -1926,6 +1927,8 @@ function LaunchPanel({
   onUpdateLaunchDraft,
   selectedConnector,
 }: LaunchPanelProps) {
+  const [isAllowedToolsPickerOpen, setIsAllowedToolsPickerOpen] = useState(false)
+  const [customAllowedToolDraft, setCustomAllowedToolDraft] = useState('')
   const selectedHost = availableHosts.find((host) => host.id === launchDraft.hostId) ?? null
   const launchCapabilities = getConnectorLaunchCapabilities(selectedConnector)
   const effectiveModel = launchDraft.model ?? selectedConnector?.defaultModel ?? ''
@@ -1933,9 +1936,6 @@ function LaunchPanel({
   const effectiveSkipPermissions = launchDraft.skipPermissions ?? selectedConnector?.skipPermissions ?? false
   const effectiveAllowedTools = launchDraft.allowedTools ?? selectedConnector?.allowedTools ?? []
   const knownAllowedToolOptions = getKnownAllowedToolOptions(selectedConnector)
-  const selectedKnownAllowedTools = effectiveAllowedTools.filter((tool) =>
-    knownAllowedToolOptions.some((option) => sameLaunchValue(option, tool)),
-  )
   const customAllowedTools = effectiveAllowedTools.filter(
     (tool) => !knownAllowedToolOptions.some((option) => sameLaunchValue(option, tool)),
   )
@@ -1969,6 +1969,14 @@ function LaunchPanel({
       : claudeCatalog
         ? 'Apply a Claude agent at session start for specialized prompts and tool rules.'
         : 'Loading discovered Claude agents…'
+  const hasExplicitAllowedTools = launchDraft.allowedTools !== null
+  const allowedToolsToggleLabel = hasExplicitAllowedTools
+    ? effectiveAllowedTools.length > 0
+      ? `${effectiveAllowedTools.length} tool rule${effectiveAllowedTools.length === 1 ? '' : 's'} selected`
+      : 'Choose allowed tools'
+    : effectiveAllowedTools.length > 0
+      ? 'Customize connector default tools'
+      : 'Choose allowed tools'
 
   const handleAllowedToolToggle = (tool: string, checked: boolean) => {
     const remainder = effectiveAllowedTools.filter((candidate) => !sameLaunchValue(candidate, tool))
@@ -1976,9 +1984,20 @@ function LaunchPanel({
     onUpdateLaunchDraft('allowedTools', nextAllowedTools)
   }
 
-  const handleCustomAllowedToolsChange = (value: string) => {
-    const nextCustomTools = parseArgumentList(value)
-    const nextAllowedTools = dedupeLaunchValues([...selectedKnownAllowedTools, ...nextCustomTools])
+  const handleCustomAllowedToolsAdd = () => {
+    const nextCustomTools = parseArgumentList(customAllowedToolDraft)
+    if (nextCustomTools.length === 0) {
+      return
+    }
+
+    const nextAllowedTools = dedupeLaunchValues([...effectiveAllowedTools, ...nextCustomTools])
+    onUpdateLaunchDraft('allowedTools', nextAllowedTools)
+    setCustomAllowedToolDraft('')
+    setIsAllowedToolsPickerOpen(true)
+  }
+
+  const handleAllowedToolRemove = (tool: string) => {
+    const nextAllowedTools = effectiveAllowedTools.filter((candidate) => !sameLaunchValue(candidate, tool))
     onUpdateLaunchDraft('allowedTools', nextAllowedTools)
   }
 
@@ -1989,12 +2008,23 @@ function LaunchPanel({
           <p className="eyebrow">Session launch</p>
           <h2>New session</h2>
         </div>
-        <button className="button button--ghost button--compact" onClick={onClose} type="button">
-          Hide
-        </button>
+        <div className="panel__header-actions">
+          <button
+            className="button button--solid button--compact"
+            data-testid="launch-session"
+            disabled={isCreatingSession}
+            form="launch-form"
+            type="submit"
+          >
+            {isCreatingSession ? 'Starting…' : 'Start session'}
+          </button>
+          <button className="button button--ghost button--compact" onClick={onClose} type="button">
+            Hide
+          </button>
+        </div>
       </div>
 
-      <form className="launch-form" data-testid="launch-form" onSubmit={onLaunchSession}>
+      <form className="launch-form" data-testid="launch-form" id="launch-form" onSubmit={onLaunchSession}>
         <label className="field">
           <span>Backplane</span>
           <select
@@ -2145,34 +2175,94 @@ function LaunchPanel({
                         disabled={launchDraft.allowedTools === null}
                         onClick={() => onUpdateLaunchDraft('allowedTools', null)}
                         type="button"
+                        >
+                          Use connector default
+                        </button>
+                      </div>
+                    <div className="tool-picker">
+                      <button
+                        aria-controls="launch-allowed-tools-menu"
+                        aria-expanded={isAllowedToolsPickerOpen}
+                        className={`tool-picker__toggle${isAllowedToolsPickerOpen ? ' is-open' : ''}`}
+                        data-testid="launch-allowed-tools-toggle"
+                        onClick={() => setIsAllowedToolsPickerOpen((current) => !current)}
+                        type="button"
                       >
-                        Use connector default
+                        <span>{allowedToolsToggleLabel}</span>
+                        <strong aria-hidden="true">{isAllowedToolsPickerOpen ? '−' : '+'}</strong>
                       </button>
-                    </div>
-                    <div className="tool-chip-grid" data-testid="launch-allowed-tools">
-                      {knownAllowedToolOptions.map((tool) => {
-                        const isSelected = effectiveAllowedTools.some((candidate) => sameLaunchValue(candidate, tool))
-                        return (
-                          <label className={`tool-chip${isSelected ? ' is-selected' : ''}`} key={tool}>
-                            <input
-                              checked={isSelected}
-                              onChange={(event) => handleAllowedToolToggle(tool, event.target.checked)}
-                              type="checkbox"
-                            />
-                            <span>{tool}</span>
+                      <div className="tool-picker__chips" data-testid="launch-allowed-tools-selected">
+                        {effectiveAllowedTools.length > 0 ? (
+                          effectiveAllowedTools.map((tool) => (
+                            <span
+                              className={`selection-chip${hasExplicitAllowedTools ? '' : ' selection-chip--readonly'}`}
+                              key={tool}
+                            >
+                              <span>{tool}</span>
+                              {hasExplicitAllowedTools ? (
+                                <button
+                                  aria-label={`Remove ${tool}`}
+                                  className="selection-chip__remove"
+                                  onClick={() => handleAllowedToolRemove(tool)}
+                                  type="button"
+                                >
+                                  ×
+                                </button>
+                              ) : null}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="tool-picker__empty">No tool rules selected for this session yet.</p>
+                        )}
+                      </div>
+                      {isAllowedToolsPickerOpen ? (
+                        <div className="tool-picker__menu" data-testid="launch-allowed-tools" id="launch-allowed-tools-menu">
+                          <div className="tool-picker__options">
+                            {knownAllowedToolOptions.map((tool) => {
+                              const isSelected = effectiveAllowedTools.some((candidate) => sameLaunchValue(candidate, tool))
+                              return (
+                                <label className={`tool-option${isSelected ? ' is-selected' : ''}`} key={tool}>
+                                  <input
+                                    checked={isSelected}
+                                    onChange={(event) => handleAllowedToolToggle(tool, event.target.checked)}
+                                    type="checkbox"
+                                  />
+                                  <span>{tool}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                          <label className="field field--nested">
+                            <span>Add custom allow rule</span>
+                            <div className="tool-picker__custom-row">
+                              <input
+                                data-testid="launch-custom-tools"
+                                placeholder="Bash(git diff *), Read"
+                                value={customAllowedToolDraft}
+                                onChange={(event) => setCustomAllowedToolDraft(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault()
+                                    handleCustomAllowedToolsAdd()
+                                  }
+                                }}
+                              />
+                              <button
+                                className="button button--ghost button--compact"
+                                disabled={!customAllowedToolDraft.trim()}
+                                onClick={handleCustomAllowedToolsAdd}
+                                type="button"
+                              >
+                                Add
+                              </button>
+                            </div>
                           </label>
-                        )
-                      })}
+                          {customAllowedTools.length > 0 ? (
+                            <p className="field-note">Custom rules are shown as chips and launch with this session override.</p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
-                    <label className="field field--nested">
-                      <span>Custom allow rules</span>
-                      <input
-                        data-testid="launch-custom-tools"
-                        placeholder="Bash(git status), Read"
-                        value={customAllowedTools.join(', ')}
-                        onChange={(event) => handleCustomAllowedToolsChange(event.target.value)}
-                      />
-                    </label>
                     <p className="field-note">{allowedToolsHint}</p>
                   </div>
                 ) : null}
@@ -2219,10 +2309,7 @@ function LaunchPanel({
             />
           </label>
         </div>
-
-        <button className="button button--solid launch-button" data-testid="launch-session" disabled={isCreatingSession}>
-          {isCreatingSession ? 'Launching…' : 'Launch session'}
-        </button>
+        <p className="field-note launch-form__footnote">This session opens directly into the workspace stage once the runtime starts.</p>
       </form>
     </section>
   )
