@@ -2179,7 +2179,7 @@ function LaunchPanel({
                           Use connector default
                         </button>
                       </div>
-                    <div className="tool-picker">
+                    <div className="tool-picker" data-testid="launch-allowed-tools">
                       <button
                         aria-controls="launch-allowed-tools-menu"
                         aria-expanded={isAllowedToolsPickerOpen}
@@ -2216,7 +2216,7 @@ function LaunchPanel({
                         )}
                       </div>
                       {isAllowedToolsPickerOpen ? (
-                        <div className="tool-picker__menu" data-testid="launch-allowed-tools" id="launch-allowed-tools-menu">
+                        <div className="tool-picker__menu" id="launch-allowed-tools-menu">
                           <div className="tool-picker__options">
                             {knownAllowedToolOptions.map((tool) => {
                               const isSelected = effectiveAllowedTools.some((candidate) => sameLaunchValue(candidate, tool))
