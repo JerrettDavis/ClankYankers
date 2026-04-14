@@ -18,7 +18,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'dotnet run --project ..\\server\\ClankYankers.Server --urls http://127.0.0.1:5023',
+      command: 'dotnet run --project ../server/ClankYankers.Server --urls http://127.0.0.1:5023',
       url: 'http://127.0.0.1:5023/api/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
