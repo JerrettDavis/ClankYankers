@@ -20,13 +20,13 @@ export default defineConfig({
     {
       command: 'dotnet run --project ../server/ClankYankers.Server --urls http://127.0.0.1:5023',
       url: 'http://127.0.0.1:5023/api/health',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 120_000,
     },
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 5173',
       url: 'http://127.0.0.1:5173',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 120_000,
     },
   ],
