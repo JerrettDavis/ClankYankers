@@ -10,6 +10,11 @@ public sealed class RemoteBackplaneTests
     [Fact]
     public async Task Remote_backplane_streams_process_output_through_the_daemon()
     {
+        if (!TerminalTestHelpers.DockerAvailable())
+        {
+            return;
+        }
+
         await using var harness = await RemoteDaemonProcessHarness.StartAsync(accessToken: "daemon-token");
         var backplane = new RemoteBackplane(NullLogger<RemoteBackplane>.Instance);
 
