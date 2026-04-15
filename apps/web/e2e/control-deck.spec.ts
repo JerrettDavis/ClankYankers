@@ -277,6 +277,8 @@ test('shows connector-specific launch overrides for client CLIs', async ({ page 
 })
 
 test('runs local shell flows end to end and records audit events', async ({ page, request }) => {
+  test.skip(ciSkip, 'Local shell sessions require Windows (ConPTY) and cannot run in CI.')
+
   await openDeck(page)
   await openWorkspace(page)
 

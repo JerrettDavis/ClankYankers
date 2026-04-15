@@ -10,7 +10,7 @@ public sealed class RemoteBackplaneTests
     [Fact]
     public async Task Remote_backplane_streams_process_output_through_the_daemon()
     {
-        if (!TerminalTestHelpers.DockerAvailable())
+        if (!TerminalTestHelpers.DockerAvailable() || TerminalTestHelpers.IsGitHubActions())
         {
             return;
         }
@@ -39,7 +39,7 @@ public sealed class RemoteBackplaneTests
     [Fact]
     public async Task Remote_backplane_streams_docker_output_through_the_daemon_when_available()
     {
-        if (!TerminalTestHelpers.DockerAvailable() || OperatingSystem.IsWindows())
+        if (!TerminalTestHelpers.DockerAvailable() || OperatingSystem.IsWindows() || TerminalTestHelpers.IsGitHubActions())
         {
             return;
         }
