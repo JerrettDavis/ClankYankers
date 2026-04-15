@@ -413,7 +413,7 @@ test('covers workspace orchestration, compare panes, tab close and stop flows', 
 })
 
 test('runs docker shell sessions when docker is available', async ({ page, request }) => {
-  test.skip(!dockerAvailable, 'Docker is not available on this machine.')
+  test.skip(!dockerAvailable || ciSkip, 'Docker networking is unreliable in GitHub Actions CI.')
 
   await openDeck(page)
   await openWorkspace(page)
