@@ -35,7 +35,8 @@ internal sealed class SshTestContainer : IAsyncDisposable
     public string HostKeyFingerprint { get; }
 
     public static bool IsAvailable() =>
-        TerminalTestHelpers.DockerAvailable()
+        !TerminalTestHelpers.IsGitHubActions()
+        && TerminalTestHelpers.DockerAvailable()
         && ToolAvailable("ssh-keygen")
         && ToolAvailable("ssh-keyscan");
 

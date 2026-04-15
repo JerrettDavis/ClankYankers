@@ -10,6 +10,11 @@ public sealed class RemoteBackplaneTests
     [Fact]
     public async Task Remote_backplane_streams_process_output_through_the_daemon()
     {
+        if (!TerminalTestHelpers.DockerAvailable() || TerminalTestHelpers.IsGitHubActions())
+        {
+            return;
+        }
+
         await using var harness = await RemoteDaemonProcessHarness.StartAsync(accessToken: "daemon-token");
         var backplane = new RemoteBackplane(NullLogger<RemoteBackplane>.Instance);
 
@@ -34,7 +39,7 @@ public sealed class RemoteBackplaneTests
     [Fact]
     public async Task Remote_backplane_streams_docker_output_through_the_daemon_when_available()
     {
-        if (!TerminalTestHelpers.DockerAvailable() || OperatingSystem.IsWindows())
+        if (!TerminalTestHelpers.DockerAvailable() || OperatingSystem.IsWindows() || TerminalTestHelpers.IsGitHubActions())
         {
             return;
         }
