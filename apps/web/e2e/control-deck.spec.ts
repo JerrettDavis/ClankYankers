@@ -18,6 +18,7 @@ const originalLogText = hadOriginalLog ? readFileSync(logPath, 'utf8') : ''
 
 const dockerAvailable = commandAvailable('docker', ['version', '--format', '{{.Server.Version}}'])
 const ollamaAvailable = commandAvailable('ollama', ['show', 'qwen3.5:9b'])
+const ciSkip = !!process.env.CI
 
 test.describe.configure({ mode: 'serial' })
 
@@ -116,6 +117,8 @@ test('surfaces Claude home catalog and status across studio pages', async ({ pag
 })
 
 test('launches a structured experiment run from the lab', async ({ page, request }) => {
+  test.skip(ciSkip, 'Local shell sessions require Windows (ConPTY) and cannot run in CI.')
+
   await openDeck(page)
 
   await openSection(page, 'lab', 'Experiment matrix and recent runs')

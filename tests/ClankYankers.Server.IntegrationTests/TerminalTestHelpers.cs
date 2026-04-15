@@ -63,4 +63,7 @@ internal static class TerminalTestHelpers
             return false;
         }
     }
+
+    public static bool IsGitHubActions() =>
+        !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"));
 }
