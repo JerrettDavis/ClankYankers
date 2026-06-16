@@ -38,6 +38,9 @@ jobs:
         run: npm ci
         working-directory: apps/web
 
+      - name: Restore solution
+        run: dotnet restore ClankYankers.slnx
+
       - name: Build solution
         run: dotnet build ClankYankers.slnx --configuration Release --no-restore /p:ContinuousIntegrationBuild=true
 
