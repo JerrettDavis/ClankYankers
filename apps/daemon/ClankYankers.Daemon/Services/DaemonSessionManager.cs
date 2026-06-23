@@ -3,19 +3,30 @@ using ClankYankers.Daemon.Runtime;
 using ClankYankers.Remote.Contracts;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace ClankYankers.Daemon.Services;
 
-internal sealed class DaemonSessionManager(ILogger<DaemonSessionManager> logger) : IAsyncDisposable
+internal sealed partial class DaemonSessionManager(ILogger<DaemonSessionManager> logger) : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, IDaemonInteractiveSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _startLock = new(1, 1);
+
+    // Session IDs must be alphanumeric with hyphens/underscores only (GUID-style or similar).
+    // This prevents log-forging by ensuring SessionId cannot contain newlines or control chars.
+    [GeneratedRegex(@"^[\w\-]{1,128}$", RegexOptions.Compiled)]
+    private static partial Regex SessionIdPattern();
 
     public async Task<RemoteSessionStartedResponse> StartAsync(StartRemoteSessionRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.SessionId))
         {
             throw new InvalidOperationException("Session requests must include a session id.");
+        }
+
+        if (!SessionIdPattern().IsMatch(request.SessionId))
+        {
+            throw new InvalidOperationException("Session ID contains invalid characters.");
         }
 
         await _startLock.WaitAsync(cancellationToken);
@@ -34,7 +45,10 @@ internal sealed class DaemonSessionManager(ILogger<DaemonSessionManager> logger)
             }
 
             _ = ObserveCompletionAsync(session);
-            logger.LogInformation("Started daemon session {SessionId} using executor {ExecutorKind}", Sanitize(request.SessionId), Sanitize(request.ExecutorKind));
+            logger.LogInformation(
+                "Started daemon session {SessionId} using executor {ExecutorKind}",
+                Sanitize(request.SessionId),
+                Sanitize(request.ExecutorKind));
 
             return new RemoteSessionStartedResponse(request.SessionId, $"/ws/session/{request.SessionId}");
         }
@@ -100,11 +114,14 @@ internal sealed class DaemonSessionManager(ILogger<DaemonSessionManager> logger)
     }
 
     /// <summary>
-    /// Removes newlines and control characters from a value before it is written to logs,
+    /// Removes newlines and other control characters from a value before it is written to logs,
     /// preventing log-forging attacks (CWE-117).
     /// </summary>
     private static string Sanitize(string? value) =>
         value is null
             ? string.Empty
-            : string.Concat(value.Where(c => c >= 0x20 && c != 0x7F));
+            : value
+                .Replace("\r\n", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Replace("\r", " ", StringComparison.Ordinal);
 }
