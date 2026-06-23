@@ -34,7 +34,7 @@ internal sealed class DaemonSessionManager(ILogger<DaemonSessionManager> logger)
             }
 
             _ = ObserveCompletionAsync(session);
-            logger.LogInformation("Started daemon session {SessionId} using executor {ExecutorKind}", request.SessionId, request.ExecutorKind);
+            logger.LogInformation("Started daemon session {SessionId} using executor {ExecutorKind}", Sanitize(request.SessionId), Sanitize(request.ExecutorKind));
 
             return new RemoteSessionStartedResponse(request.SessionId, $"/ws/session/{request.SessionId}");
         }
@@ -82,7 +82,7 @@ internal sealed class DaemonSessionManager(ILogger<DaemonSessionManager> logger)
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Daemon session {SessionId} completed with an error.", session.SessionId);
+            logger.LogWarning(exception, "Daemon session {SessionId} completed with an error.", Sanitize(session.SessionId));
         }
         finally
         {
@@ -94,8 +94,17 @@ internal sealed class DaemonSessionManager(ILogger<DaemonSessionManager> logger)
             }
             catch (Exception exception)
             {
-                logger.LogWarning(exception, "Daemon session {SessionId} disposal failed.", session.SessionId);
+                logger.LogWarning(exception, "Daemon session {SessionId} disposal failed.", Sanitize(session.SessionId));
             }
         }
     }
+
+    /// <summary>
+    /// Removes newlines and control characters from a value before it is written to logs,
+    /// preventing log-forging attacks (CWE-117).
+    /// </summary>
+    private static string Sanitize(string? value) =>
+        value is null
+            ? string.Empty
+            : string.Concat(value.Where(c => c >= 0x20 && c != 0x7F));
 }
